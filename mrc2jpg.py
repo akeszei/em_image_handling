@@ -25,7 +25,7 @@ def usage():
     print(" Usage:")
     print("    $ mrc2jpg.py  input.mrc  output.jpg")
     print(" Batch mode:")
-    print("    $ ser2mrc.py  *.mrc  @.jpg")
+    print("    $ mrc2jpg.py  *.mrc  @.jpg")
     print(" -----------------------------------------------------------------------------------------------")
     print(" Options: ")
     print("           --bin (4) : binning factor for image")
