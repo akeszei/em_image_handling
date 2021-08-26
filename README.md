@@ -7,5 +7,5 @@ Scripts to convert from one image type to another for common EM file types.
 ser2mrc.py  input.ser  output.mrc
 ser2mrc.py  *.ser  @.mrc # batch mode 
 ---
--------
+
 <b>serReader.py</b> = A dependency for all ThermoFisher TIA-generated .SER file handling. This is a backup copy from the original authors Peter Ercius @ openNCEM (https://bitbucket.org/ercius/openncem/src/master/)
