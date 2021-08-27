@@ -21,6 +21,7 @@ def usage():
     """
     print("===================================================================================================")
     print(" Convert .MRC 2D EM images to .JPG format. Alternative output formats can be used (.PNG, .TIF, .GIF)")
+    print(" Consider making symbolic links to this script for other formats, (e.g. ln -s mrc2jpg.py mrc2gif.py)")
     print(" Options include binning and addition of a scalebar of specified size.")
     print(" Usage:")
     print("    $ mrc2jpg.py  input.mrc  output.jpg")
