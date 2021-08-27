@@ -55,4 +55,4 @@ I/O parser for .MRC image format. See: (https://pypi.org/project/mrcfile/)/
 
 
 #### serReader.py  
-A custom parser to read/write ThermoFisher TIA-generated .SER format. This is a backup copy from the original author Peter Ercius @ openNCEM (https://bitbucket.org/ercius/openncem/src/master/, also at https://github.com/ercius/openNCEM). This dependency is satisfied so long as it is *saved in the same directory as the running scripts*. 
+A custom parser to read/write ThermoFisher TIA-generated .SER format. This is a backup copy from the original author Peter Ercius @ openNCEM (https://bitbucket.org/ercius/openncem/src/master/, also at https://github.com/ercius/openNCEM). This dependency is satisfied so long as it is *saved in the same directory as the running/parent scripts*. 
