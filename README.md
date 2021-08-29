@@ -10,7 +10,7 @@ Convert .MRC 2D EM images to .JPG,.PNG,.TIF, or .GIF formats.
 
 Options include binning and addition of a scalebar of a specified size (in Angstroms), e.g.:
 
-`mrc2.img.py  input.mrc output.jpg  --bin 4 --scalebar 200 --angpix 1.94`
+`mrc2img.py  input.mrc output.jpg  --bin 4 --scalebar 200 --angpix 1.94`
 
 Batch mode is enabled in a similar flavor to `e2proc2d.py` by using glob matching and defining the output format with an `@` symbol:  
 
