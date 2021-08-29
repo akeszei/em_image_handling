@@ -23,9 +23,9 @@ Convert ThermoFischer TIA-generated .SER format 2D EM images to .MRC format.
 
 `ser2mrc.py   input.ser   output.mrc `
 
-Optionally, can also output a binned .JPG image in addition to the .MRC file, e.g.:
+Optionally, can also output a 4x binned .JPG image in addition to the .MRC file (adjust the default binning factor with `--bin_jpg n` flag), e.g.:
 
-`ser2mrc.py input.ser  output.mrc --jpeg 4`
+`ser2mrc.py input.ser  output.mrc --jpg  `
 
 Batch mode is enabled as above, where the basename of the .SER file is inherited as the name of the output .MRC file: 
 
