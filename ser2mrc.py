@@ -30,8 +30,8 @@ def usage():
     print("    $ ser2mrc.py  *.ser  @.mrc")
     print(" -----------------------------------------------------------------------------------------------")
     print(" Options (defaults in brackets): ")
-    print("            --jpg : also save a .jpg image of the .MRC file")
-    print("    --bin_jpg (4) : bin the jpg file before saving it to disk")
+    print("            --jpg : also save a 4x binned .jpg image of the .MRC file")
+    print("    --bin_jpg (4) : adjust the default binning factor of the jpg file")
     print("===================================================================================================")
     sys.exit()
 
