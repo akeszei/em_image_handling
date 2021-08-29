@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-    A script to convert TIA-format .SER images to single-precision 32-bit float .MRC mode #2 format
-    Serves as a replacement to EMAN e2proc2d.py conversion script
+    A script to convert .MRC images to .JPG (or other) format with optional binning
+    and scalebar.
 """
 
-## 2021-08-25: Script written
-## 2021-08-28: Updated error handling and command line parsing to make more general/flexible
+## 2021-08-26: Script written
+## 2021-08-28: Updated command line parsing to make more general, and renamed script to reflect multiple image handling
 
 #############################
 ###     FLAGS
@@ -21,19 +21,20 @@ def usage():
     """ This script requires several input arguments to work correctly. Check they exist, otherwise print usage and exit.
     """
     print("===================================================================================================")
-    print(" Script to convert ThermoFischer TIA-generated .SER format 2D EM images to .MRC format. ")
-    print(" Optionally, can output binned .jpeg images as it runs. Dependencies include mrcfile and ")
-    print(" serReader.py scipt, which must be in the same directory as this script.")
+    print(" Convert .MRC 2D EM images to conventional image formats (.PNG, .TIF, .GIF).")
+    print(" Options include binning and addition of a scalebar of specified size.")
     print(" Usage:")
-    print("    $ ser2mrc.py  input.ser  output.mrc  <options>")
+    print("    $ mrc2img.py  input.mrc  output.jpg    # or other format, e.g. output.gif")
     print(" Batch mode:")
-    print("    $ ser2mrc.py  *.ser  @.mrc")
+    print("    $ mrc2img.py  *.mrc  @.jpg")
     print(" -----------------------------------------------------------------------------------------------")
-    print(" Options (defaults in brackets): ")
-    print("            --jpg : also save a .jpg image of the .MRC file")
-    print("    --bin_jpg (4) : bin the jpg file before saving it to disk")
+    print(" Options (default in brackets): ")
+    print("           --bin (4) : binning factor for image")
+    print("    --scalebar (200) : add scalebar in Angstroms. Note: uses 1.94 Ang/px by default")
+    print("     --angpix (1.94) : Angstroms per pixel in .mrc image")
     print("===================================================================================================")
     sys.exit()
+    return
 
 def read_flag(cmd_line, flag, cmd_line_flag_index, GLOBAL_VARS_key, data_type, legal_entries, is_toggle, has_defaults):
     global GLOBAL_VARS, EXPECTED_FLAGS
@@ -165,54 +166,69 @@ def parse_cmd_line(min_input = 1):
 
     return
 
-def get_ser_data(file):
-    ## use serReader module to parse the .SER file data into memory
-    im = serReader.serReader(file)
-    ## get the image data as an np.ndarray of dimension x, y from TIA .SER image
-    im_data = im['data']
-    ## recast the int32 data coming out of serReader into float32 for use as mrc mode #2
-    im_float32 = im_data.astype(np.float32)
-    return im_float32
+def get_mrc_data(file):
+    """ file = .mrc file
+        returns np.ndarray of the mrc data using mrcfile module
+    """
+    with mrcfile.open(file) as mrc:
+        image_data = mrc.data
+    return image_data
 
-def save_mrc_image(im_data, output_name):
-    """
-        im_data = needs to be np.array float32 with dimensions of the TIA image
-        output_name = string; name of the output file to be saved
-    """
-    with mrcfile.new(output_name, overwrite = True) as mrc:
-        mrc.set_data(im_data)
-        mrc.update_header_from_data()
-        mrc.update_header_stats()
+def save_image(mrc_data, mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
+
+    ## rescale the image data to grayscale range (0,255)
+    remapped = (255*(mrc_data - np.min(mrc_data))/np.ptp(mrc_data)).astype(int) ## remap data from 0 -- 255
+    ## load the image data into a PIL.Image object
+    im = Image.fromarray(remapped).convert('RGB')
+
+    ## figure out the name of the file
+    if GLOBAL_VARS['BATCH_MODE']:
+        ## in batch mode, inherit the base name of the .MRC file, just change the extension
+        output_format = os.path.splitext(output_file)[1].lower()
+        img_name = os.path.splitext(mrc_filename)[0] + output_format
+    else:
+        img_name = output_file
+
+    ## bin the image to the desired size
+    resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
+
+    # make a scalebar if requested
+    if PRINT_SCALEBAR:
+        rescaled_angpix = angpix * binning_factor
+        scalebar_px = int(scalebar_angstroms / rescaled_angpix)
+        resized_im = add_scalebar(resized_im, scalebar_px)
+
+    ## save the image to disc
+    resized_im.save(img_name)
+    # resized_im.show()
 
     if DEBUG:
-        print(" ... .ser converted to: %s" % output_name)
-    return
-
-def save_jpeg_image(mrc_file, binning_factor):
-    ## sanity check the binning factor
-    try:
-        binning_factor = int(binning_factor)
-    except:
-        print("ERROR: Incompatible binnign factor provided: %s, use an integer (E.g. --jpeg 4)" % (binning_factor))
-
-    ## open the mrc file and use its data to generate the image
-    with mrcfile.open(mrc_file) as mrc:
-        ## rescale the image data to grayscale range (0,255)
-        remapped = (255*(mrc.data - np.min(mrc.data))/np.ptp(mrc.data)).astype(int) ## remap data from 0 -- 255
-        ## load the image data into a PIL.Image object
-        im = Image.fromarray(remapped).convert('RGB')
-        ## bin the image to the desired size
-        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
-        jpg_name = os.path.splitext(mrc_file)[0] + '.jpg'
-        # im.show()
-        ## save the image to disc
-        resized_im.save(jpg_name)
-
-    if DEBUG:
-        print("    >> .jpg written: %s (%s x binning)" % (jpg_name, binning_factor))
+        print("  >> .jpg written: %s" % img_name )
 
     return
 
+def add_scalebar(image_obj, scalebar_px):
+    """ Adds a scalebar to the input image and returns a new edited image
+    """
+    ## set the indentation to be ~2.5% inset from the bottom left corner of the image
+    indent_px = int(image_obj.height * 0.025)
+    ## set the stroke to be ~0.5% image size
+    stroke = int(image_obj.height * 0.005)
+    if stroke < 1:
+        stroke = 1
+    print("Scale bar info: (offset px, stroke) = (%s, %s)" % (indent_px, stroke))
+    ## find the pixel range for the scalebar, typically 5 x 5 pixels up from bottom left
+    LEFT_INDENT = indent_px # px from left to indent the scalebar
+    BOTTOM_INDENT = indent_px # px from bottom to indent the scalebar
+    STROKE = stroke # px thickness of scalebar
+    x_range = (LEFT_INDENT, LEFT_INDENT + scalebar_px)
+    y_range = (image_obj.height - BOTTOM_INDENT - STROKE, image_obj.height - BOTTOM_INDENT)
+
+    ## set the pixels white for the scalebar
+    for x in range(x_range[0], x_range[1]):
+        for y in range(y_range[0], y_range[1]):
+            image_obj.putpixel((x, y), (255, 255, 255))
+    return image_obj
 
 #############################
 ###     RUN BLOCK
@@ -220,9 +236,6 @@ def save_jpeg_image(mrc_file, binning_factor):
 
 if __name__ == "__main__":
 
-    ##################################
-    ## DEPENDENCIES
-    ##################################
     import os
     import sys
     import glob
@@ -241,24 +254,20 @@ if __name__ == "__main__":
         print(" Could not import mrcfile module. Install via:")
         print(" > pip install mrcfile")
         sys.exit()
-
-    try:
-        import serReader # serReader must be in the path as this script
-    except:
-        print(" Could not import serReader module. Make sure script is in same directory as main script: ")
-        print("  > %s" % os.path.realpath(__file__))
-        sys.exit()
     ##################################
 
     ##################################
     ## ASSIGN DEFAULT VARIABLES
     ##################################
     GLOBAL_VARS = {
-        'ser_file' : str(),
         'mrc_file' : str(),
+        'output_file' : str(),
         'BATCH_MODE' : False,
-        'PRINT_JPEG' : False,
-        'jpg_binning_factor' : 4
+        'BIN_IMAGE' : False,
+        'binning_factor' : 4,
+        'PRINT_SCALEBAR' : False,
+        'scalebar_angstroms' : 200, # Angstroms
+        'angpix' : 1.94
         }
     ##################################
 
@@ -266,40 +275,48 @@ if __name__ == "__main__":
     ## SET UP EXPECTED DATA FOR PARSER
     ##################################
     EXPECTED_FLAGS = {
-     ##    flag      :  (GLOBAL_VARS_key,   data_type,  legal_entries/range,    is_toggle,   has_defaults)
-        '--jpg'      :  ('PRINT_JPEG'   ,    bool(),    (),                     True,       False ),
-        '--bin_jpg'  :  ('jpg_binning_factor',   int(),     (1, 999),            False,      True )
+     ##    flag      :  (GLOBAL_VARS_key,       data_type,  legal_entries/range,    is_toggle,  has_defaults)
+        '--bin'      :  ('binning_factor'   ,    int(),     (1, 999),               False,      True ),
+        '--scalebar' :  ('scalebar_angstroms',   int(),     (1, 9999),              False,      True ),
+        '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,      True )
     }
 
-    EXPECTED_FILES = [  # cmd_line_index,   expected_extension,     GLOBAL_VARS_key
-                    (   1,                  '.ser',                 'ser_file'),
-                    (   2,                  '.mrc',                 'mrc_file')
+    EXPECTED_FILES = [  # cmd_line_index,   expected_extension,                         GLOBAL_VARS_key
+                    (   1,                  '.mrc',                                     'mrc_file'),
+                    (   2,                  ['.jpg', '.jpeg', '.png', '.tif', '.gif'],  'output_file')
                     ]
     ##################################
 
     parse_cmd_line(min_input = 2)
 
-    ## single image conversion mode
+    ## add a custom checks outside scope of general parser above
+    commands = []
+    ## get all commands used
+    for n in range(len(sys.argv[1:])+1):
+        commands.append(sys.argv[n])
+        ## check if --bin was given as a command, in which case toggle on the flag
+        if '--bin' in commands:
+            GLOBAL_VARS['BIN_IMAGE'] = True
+        ## check if --scalebar was given as a command, in which case toggle on the flag
+        if '--scalebar' in commands:
+            GLOBAL_VARS['PRINT_SCALEBAR'] = True
+
+    ## print warning if no --angpix is given but --scalebar is (i.e. user may want to use a different pixel size)
+    if GLOBAL_VARS['PRINT_SCALEBAR']:
+        commands = []
+        ## get all commands used
+        for n in range(len(sys.argv[1:])+1):
+            commands.append(sys.argv[n])
+        ## check if --angpix was given
+        if not '--angpix' in commands:
+            print("!! WARNING: --scalebar was given without an explicit --angpix, using default value of 1.94 Ang/px !!")
+
+
     if not GLOBAL_VARS['BATCH_MODE']:
-
-        ## get data from .SER file
-        im_data = get_ser_data(GLOBAL_VARS['ser_file'])
-        ## save the data to a .MRC file
-        save_mrc_image(im_data, GLOBAL_VARS['mrc_file'])
-        ## optionally save a .JPEG file with binning
-        if GLOBAL_VARS['PRINT_JPEG']:
-            save_jpeg_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['jpg_binning_factor'])
-
-    ## batch image conversion mode
+        ## single image conversion mode
+        save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
     else:
         ## get all files with extension
-        for file in glob.glob("*.ser"):
-            ## then run through them one-by-one
-            current_file_base_name = os.path.splitext(file)[0]
-            ## get data from .SER file
-            im_data = get_ser_data(file)
-            ## save the data to a .MRC file
-            save_mrc_image(im_data, current_file_base_name + ".mrc")
-            ## optionally save a .JPEG file with binning
-            if GLOBAL_VARS['PRINT_JPEG']:
-                save_jpeg_image(current_file_base_name + ".mrc", GLOBAL_VARS['jpg_binning_factor'])
+        for file in glob.glob("*.mrc"):
+            GLOBAL_VARS['mrc_file'] = file
+            save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
