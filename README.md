@@ -3,20 +3,19 @@ Scripts to convert from one image type to another, focusing on common EM image t
 
 ## Usages
 
-#### mrc2jpg.py
+#### mrc2img.py
 Convert .MRC 2D EM images to .JPG,.PNG,.TIF, or .GIF formats.  
 
-`mrc2jpg.py   input.mrc  output.jpg `
+`mrc2img.py   input.mrc  output.jpg `
 
 Options include binning and addition of a scalebar of a specified size (in Angstroms), e.g.:
 
-`mrc2.jpg.py  input.mrc output.jpg  --bin 4 --scalebar 200 --angpix 1.94`
+`mrc2.img.py  input.mrc output.jpg  --bin 4 --scalebar 200 --angpix 1.94`
 
 Batch mode is enabled in a similar flavor to `e2proc2d.py` by using glob matching and defining the output format with an `@` symbol:  
 
-`mrc2jpg.py   *.mrc  @.jpg `
+`mrc2img.py   *.mrc  @.jpg `
 
-Since this script can output more than .JPG format, consider linking the script with alternate names for user clarity (e.g. `ln -s mrc2jpg.py mrc2png.py`).
 
 -----
 #### ser2mrc.py
