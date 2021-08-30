@@ -26,7 +26,7 @@ def usage():
     print(" Usage:")
     print("    $ mrc2img.py  input.mrc  output.jpg/png/tif/gif  <options> ")
     print(" Batch mode:")
-    print("    $ mrc2img.py  *.mrc  @.jpg/png/tif/gif")
+    print("    $ mrc2img.py  @.jpg/png/tif/gif")
     print(" -----------------------------------------------------------------------------------------------")
     print(" Options (default in brackets): ")
     print("           --bin (4) : binning factor for image")
@@ -165,14 +165,15 @@ def get_mrc_data(file):
 def save_image(mrc_data, mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
 
     ## rescale the image data to grayscale range (0,255)
-    remapped = (255*(mrc_data - np.min(mrc_data))/np.ptp(mrc_data)).astype(int) ## remap data from 0 -- 255
+    remapped = (255*(mrc_data - np.min(mrc_data))/np.ptp(mrc_data)).astype(np.uint8) ## remap data from 0 -- 255
     ## load the image data into a PIL.Image object
     im = Image.fromarray(remapped).convert('RGB')
 
     ## figure out the name of the file
     if GLOBAL_VARS['BATCH_MODE']:
-        ## in batch mode, inherit the base name of the .MRC file, just change the extension
-        output_format = os.path.splitext(output_file)[1].lower()
+        ## in batch mode, inherit the base name of the .MRC file, just change the extension to the one provided by the user
+        # output_format = os.path.splitext(output_file)[1].lower()
+        output_format = os.path.splitext(sys.argv[1])[1]
         img_name = os.path.splitext(mrc_filename)[0] + output_format
     else:
         img_name = output_file
@@ -191,7 +192,7 @@ def save_image(mrc_data, mrc_filename, output_file, BATCH_MODE, binning_factor, 
     # resized_im.show()
 
     if DEBUG:
-        print("  >> .jpg written: %s" % img_name )
+        print("  >> image written: %s" % img_name )
 
     return
 
@@ -275,7 +276,7 @@ if __name__ == "__main__":
                     ]
     ##################################
 
-    parse_cmd_line(min_input = 2)
+    parse_cmd_line(min_input = 1)
 
     ## add a custom checks outside scope of general parser above
     commands = []

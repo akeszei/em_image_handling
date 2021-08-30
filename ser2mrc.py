@@ -265,7 +265,7 @@ if __name__ == "__main__":
                     ]
     ##################################
 
-    parse_cmd_line(min_input = 2)
+    parse_cmd_line(min_input = 1)
 
     ## single image conversion mode
     if not GLOBAL_VARS['BATCH_MODE']:
