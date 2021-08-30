@@ -27,7 +27,7 @@ def usage():
     print(" Usage:")
     print("    $ ser2mrc.py  input.ser  output.mrc  <options>")
     print(" Batch mode:")
-    print("    $ ser2mrc.py  *.ser  @.mrc")
+    print("    $ ser2mrc.py  @.mrc")
     print(" -----------------------------------------------------------------------------------------------")
     print(" Options (defaults in brackets): ")
     print("            --jpg : also save a 4x binned .jpg image of the .MRC file")
@@ -117,6 +117,7 @@ def parse_cmd_line(min_input = 1):
     global GLOBAL_VARS, EXPECTED_FLAGS, EXPECTED_FILES
     ## retrieve all entries on the cmd line and parse them into global variables
     cmd_line = tuple(sys.argv)
+
     ## check there is a minimum number of arguments input by the user
     if len(cmd_line) - 1 < min_input:
         usage()
@@ -126,33 +127,20 @@ def parse_cmd_line(min_input = 1):
             print(' ... help flag called (%s), printing usage and exiting.' % entry)
             usage()
 
-    ## load all expected files based on their explicit index and check for proper extension in name
-    BATCH_MODE_FILE1 = False
-    for index, expected_extension, key in EXPECTED_FILES:
-        parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
-        if len(parsed_extension) == 0:
-            print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
-            usage()
-        elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
-            GLOBAL_VARS[key] = cmd_line[index]
-            print(" ... %s set: %s" % (key, GLOBAL_VARS[key]))
-        else:
-            print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
-            usage()
-        ## check if user is attempting to set up batch mode, which requires file #1 to start with * and file #2 to start with @ symbol:
-        if index == 1:
-            if os.path.splitext(os.path.basename(GLOBAL_VARS[key]))[0] == "*":
-                BATCH_MODE_FILE1 = True
-        elif index == 2:
-            if BATCH_MODE_FILE1:
-                if os.path.splitext(os.path.basename(GLOBAL_VARS[key]))[0] == "@":
-                    GLOBAL_VARS['BATCH_MODE'] = True
-                    print(" ... batch mode = ON")
-                else:
-                    print(" ERROR :: Batch mode detected (%s), but incorrect second entry (%s)" % ('*' + EXPECTED_FILES[0][1], cmd_line[index]))
-                    usage()
-            elif os.path.splitext(os.path.basename(GLOBAL_VARS[key]))[0] == "@":
-                print(" ERROR :: Batch mode detected (%s), but incorrect first entry (%s)" % (cmd_line[2], cmd_line[1]))
+    ## check first if batch mode is being activated, if not then check for the proper file in each argument position
+    if os.path.splitext(cmd_line[1])[0] == '@':
+        GLOBAL_VARS['BATCH_MODE'] = True
+        print(" ... batch mode = ON")
+    else:
+        for index, expected_extension, key in EXPECTED_FILES:
+            if len(parsed_extension) == 0:
+                print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
+                usage()
+            elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
+                GLOBAL_VARS[key] = cmd_line[index]
+                print(" ... %s set: %s" % (key, GLOBAL_VARS[key]))
+            else:
+                print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
                 usage()
 
     ## after checking for help flags, try to read in all flags into global dictionary
@@ -198,7 +186,7 @@ def save_jpeg_image(mrc_file, binning_factor):
     ## open the mrc file and use its data to generate the image
     with mrcfile.open(mrc_file) as mrc:
         ## rescale the image data to grayscale range (0,255)
-        remapped = (255*(mrc.data - np.min(mrc.data))/np.ptp(mrc.data)).astype(int) ## remap data from 0 -- 255
+        remapped = (255*(mrc.data - np.min(mrc.data))/np.ptp(mrc.data)).astype(np.uint8) ## remap data from 0 -- 255
         ## load the image data into a PIL.Image object
         im = Image.fromarray(remapped).convert('RGB')
         ## bin the image to the desired size

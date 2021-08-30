@@ -127,33 +127,21 @@ def parse_cmd_line(min_input = 1):
             print(' ... help flag called (%s), printing usage and exiting.' % entry)
             usage()
 
-    ## load all expected files based on their explicit index and check for proper extension in name
-    BATCH_MODE_FILE1 = False
-    for index, expected_extension, key in EXPECTED_FILES:
-        parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
-        if len(parsed_extension) == 0:
-            print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
-            usage()
-        elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
-            GLOBAL_VARS[key] = cmd_line[index]
-            print(" ... %s set: %s" % (key, GLOBAL_VARS[key]))
-        else:
-            print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
-            usage()
-        ## check if user is attempting to set up batch mode, which requires file #1 to start with * and file #2 to start with @ symbol:
-        if index == 1:
-            if os.path.splitext(os.path.basename(GLOBAL_VARS[key]))[0] == "*":
-                BATCH_MODE_FILE1 = True
-        elif index == 2:
-            if BATCH_MODE_FILE1:
-                if os.path.splitext(os.path.basename(GLOBAL_VARS[key]))[0] == "@":
-                    GLOBAL_VARS['BATCH_MODE'] = True
-                    print(" ... batch mode = ON")
-                else:
-                    print(" ERROR :: Batch mode detected (%s), but incorrect second entry (%s)" % ('*' + EXPECTED_FILES[0][1], cmd_line[index]))
-                    usage()
-            elif os.path.splitext(os.path.basename(GLOBAL_VARS[key]))[0] == "@":
-                print(" ERROR :: Batch mode detected (%s), but incorrect first entry (%s)" % (cmd_line[2], cmd_line[1]))
+    ## check first if batch mode is being activated, if not then check for the proper file in each argument position
+    if os.path.splitext(cmd_line[1])[0] == '@':
+        GLOBAL_VARS['BATCH_MODE'] = True
+        print(" ... batch mode = ON")
+    else:
+        for index, expected_extension, key in EXPECTED_FILES:
+            parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
+            if len(parsed_extension) == 0:
+                print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
+                usage()
+            elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
+                GLOBAL_VARS[key] = cmd_line[index]
+                print(" ... %s set: %s" % (key, GLOBAL_VARS[key]))
+            else:
+                print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
                 usage()
 
     ## after checking for help flags, try to read in all flags into global dictionary
