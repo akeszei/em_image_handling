@@ -295,11 +295,23 @@ if __name__ == "__main__":
         ## get all files with extension
         for file in glob.glob("*.ser"):
             ## then run through them one-by-one
+            GLOBAL_VARS['ser_file'] = file
             current_file_base_name = os.path.splitext(file)[0]
+            GLOBAL_VARS['mrc_file'] = current_file_base_name + ".mrc"
+
             ## get data from .SER file
-            im_data = get_ser_data(file)
+            im_data = get_ser_data(GLOBAL_VARS['ser_file'])
             ## save the data to a .MRC file
-            save_mrc_image(im_data, current_file_base_name + ".mrc")
+            save_mrc_image(im_data, GLOBAL_VARS['mrc_file'])
             ## optionally save a .JPEG file with binning
             if GLOBAL_VARS['PRINT_JPEG']:
-                save_jpeg_image(current_file_base_name + ".mrc", GLOBAL_VARS['jpg_binning_factor'])
+                save_jpeg_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['jpg_binning_factor'])
+
+            # current_file_base_name = os.path.splitext(file)[0]
+            # ## get data from .SER file
+            # im_data = get_ser_data(file)
+            # ## save the data to a .MRC file
+            # save_mrc_image(im_data, current_file_base_name + ".mrc")
+            # ## optionally save a .JPEG file with binning
+            # if GLOBAL_VARS['PRINT_JPEG']:
+            #     save_jpeg_image(current_file_base_name + ".mrc", GLOBAL_VARS['jpg_binning_factor'])
