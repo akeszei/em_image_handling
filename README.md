@@ -12,9 +12,9 @@ Options include binning and addition of a scalebar of a specified size (in Angst
 
 `mrc2img.py  input.mrc output.jpg  --bin 4 --scalebar 200 --angpix 1.94`
 
-Batch mode is enabled in a similar flavor to `e2proc2d.py` by using glob matching and defining the output format with an `@` symbol:  
+Batch mode is enabled by using glob matching to find all mrc files (via `*.mrc`) and defining the output format with an `@` symbol:  
 
-`mrc2img.py   *.mrc  @.jpg `
+`mrc2img.py   @.jpg `
 
 
 -----
@@ -27,9 +27,9 @@ Optionally, can also output a 4x binned .JPG image in addition to the .MRC file 
 
 `ser2mrc.py input.ser  output.mrc --jpg  `
 
-Batch mode is enabled as above, where the basename of the .SER file is inherited as the name of the output .MRC file: 
+Batch mode is enabled as above: 
 
-`ser2mrc.py   *.ser   @.mrc `  
+`ser2mrc.py   @.mrc `  
 
 
 ---
