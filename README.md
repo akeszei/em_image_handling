@@ -12,7 +12,7 @@ Options include binning and addition of a scalebar of a specified size (in Angst
 
 `mrc2img.py  input.mrc output.jpg  --bin 4 --scalebar 200 --angpix 1.94`
 
-Batch mode is enabled by using glob matching to find all mrc files (via `*.mrc`) and defining the output format with an `@` symbol:  
+Batch mode is enabled by omitting an input `.mrc` file and simply defining the output format with an `@` symbol (internally the script uses glob matching, `*.mrc`, to find all mrc files in the working directory):  
 
 `mrc2img.py   @.jpg `
 
