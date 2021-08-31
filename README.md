@@ -16,6 +16,9 @@ Batch mode is enabled by omitting an input `.mrc` file and simply defining the o
 
 `mrc2img.py   @.jpg `
 
+Batch mode also permits parallelization, allowing the user to specify `n` cores to launch jobs with:
+
+`mrc2img.py  @.jpg --j n`
 
 -----
 #### ser2mrc.py
@@ -27,7 +30,7 @@ Optionally, can also output a 4x binned .JPG image in addition to the .MRC file 
 
 `ser2mrc.py input.ser  output.mrc --jpg  `
 
-Batch mode is enabled as above: 
+Batch mode is enabled as above:
 
 `ser2mrc.py   @.mrc `  
 
@@ -35,7 +38,7 @@ Batch mode is enabled as above:
 ---
 
 ## Dependencies
-The goal of these scripts are to provide straight-forward, flexible, scripts that have simple cross-platform dependencies. Most modules can be installed via `pip`, others are provided within the repo itself. 
+The goal of these scripts are to provide straight-forward, flexible, scripts that have simple cross-platform dependencies. Most modules can be installed via `pip`, others are provided within the repo itself.
 
 #### NumPy
 Calculation & array handling in python. See: (https://numpy.org/)
@@ -54,4 +57,4 @@ I/O parser for .MRC image format. See: (https://pypi.org/project/mrcfile/)/
 
 
 #### serReader.py  
-A custom parser to read/write ThermoFisher TIA-generated .SER format. This is a backup copy from the original author Peter Ercius @ openNCEM (https://bitbucket.org/ercius/openncem/src/master/, also at https://github.com/ercius/openNCEM). This dependency is satisfied so long as it is *saved in the same directory as the running/parent scripts*. 
+A custom parser to read/write ThermoFisher TIA-generated .SER format. This is a backup copy from the original author Peter Ercius @ openNCEM (https://bitbucket.org/ercius/openncem/src/master/, also at https://github.com/ercius/openNCEM). This dependency is satisfied so long as it is *saved in the same directory as the running/parent scripts*.

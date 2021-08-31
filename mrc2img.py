@@ -32,6 +32,7 @@ def usage():
     print("           --bin (4) : binning factor for image")
     print("    --scalebar (200) : add scalebar in Angstroms. Note: uses 1.94 Ang/px by default")
     print("     --angpix (1.94) : Angstroms per pixel in .mrc image")
+    print("             --j (4) : Allow multiprocessing using indicated number of cores")
     print("===================================================================================================")
     sys.exit()
     return
@@ -128,9 +129,15 @@ def parse_cmd_line(min_input = 1):
             usage()
 
     ## check first if batch mode is being activated, if not then check for the proper file in each argument position
-    if os.path.splitext(cmd_line[1])[0] == '@':
+    if '@' in os.path.splitext(cmd_line[1])[0]:
         GLOBAL_VARS['BATCH_MODE'] = True
         print(" ... batch mode = ON")
+
+        ## if batchmode is active, then confirm the requested filetype is expected
+        if not os.path.splitext(cmd_line[1])[1] in EXPECTED_FILES[1][1]:
+            print(" ERROR :: Requested output filetype (%s) not recognized. Try one of: %s" % (os.path.splitext(cmd_line[1])[1], EXPECTED_FILES[1][1]))
+            sys.exit()
+
     else:
         for index, expected_extension, key in EXPECTED_FILES:
             parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
@@ -162,15 +169,47 @@ def get_mrc_data(file):
         image_data = mrc.data
     return image_data
 
+def apply_sigma_contrast(im_data, sigma_value):
+    """
+        Apply sigma contrast to an image.
+    PARAMETERS
+        im_data = 2d np.array
+        sigma_value = float; typical values are 3 - 4
+    RETURNS
+        2d np.array, where values from original array are rescaled based on the sigma contrast value
+    """
+    ## 1. find the standard deviation of the data set
+    im_stdev = np.std(im_data)
+    ## 2. find the mean of the dataset
+    im_mean = np.mean(im_data)
+    ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
+    sigma_contrast = 3.5 ## set the limits of the pixel values we want for min and max
+    min = im_mean - (sigma_contrast * im_stdev)
+    max = im_mean + (sigma_contrast * im_stdev)
+    ## 4. clip the dataset to the min and max values
+    im_contrast_adjusted = np.clip(im_data, min, max)
+
+    return im_contrast_adjusted
+
+
 def save_image(mrc_data, mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
+    check_dependencies()
+    # need to recast imported module as the general keyword to use
+    import PIL.Image as Image
+
+    print("mrc_filename = %s" % mrc_filename)
+
+    ## apply sigma contrast to the image
+    im_contrast_adjusted = apply_sigma_contrast(mrc_data, 3.5)
 
     ## rescale the image data to grayscale range (0,255)
-    remapped = (255*(mrc_data - np.min(mrc_data))/np.ptp(mrc_data)).astype(np.uint8) ## remap data from 0 -- 255
+    remapped = (255*(im_contrast_adjusted - np.min(im_contrast_adjusted))/np.ptp(im_contrast_adjusted)).astype(np.uint8) ## remap data from 0 -- 255
+
     ## load the image data into a PIL.Image object
     im = Image.fromarray(remapped).convert('RGB')
 
     ## figure out the name of the file
-    if GLOBAL_VARS['BATCH_MODE']:
+    if BATCH_MODE:
         ## in batch mode, inherit the base name of the .MRC file, just change the extension to the one provided by the user
         # output_format = os.path.splitext(output_file)[1].lower()
         output_format = os.path.splitext(sys.argv[1])[1]
@@ -196,6 +235,7 @@ def save_image(mrc_data, mrc_filename, output_file, BATCH_MODE, binning_factor, 
 
     return
 
+
 def add_scalebar(image_obj, scalebar_px):
     """ Adds a scalebar to the input image and returns a new edited image
     """
@@ -219,6 +259,39 @@ def add_scalebar(image_obj, scalebar_px):
             image_obj.putpixel((x, y), (255, 255, 255))
     return image_obj
 
+
+def chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
+def check_dependencies():
+    ## load built-in packages, if they fail to load then python install is completely wrong!
+    globals()['sys'] = __import__('sys')
+    globals()['os'] = __import__('os')
+    globals()['glob'] = __import__('glob')
+    globals()['mp'] = __import__('multiprocessing') ## similar to: import numpy as np
+
+    try:
+        globals()['np'] = __import__('numpy') ## similar to: import numpy as np
+    except:
+        print(" ERROR :: Failed to import 'numpy'. Try: pip install numpy")
+        sys.exit()
+
+    try:
+        from PIL import Image
+    except:
+        print(" Could not import PIL.Image. Install depenency via:")
+        print(" > pip install --upgrade Pillow")
+        sys.exit()
+
+    try:
+        globals()['mrcfile'] = __import__('mrcfile') ## similar to: import numpy as np
+    except:
+        print(" ERROR :: Failed to import 'mrcfile'. Try: pip install mrcfile")
+        sys.exit()
+
+
 #############################
 ###     RUN BLOCK
 #############################
@@ -229,6 +302,7 @@ if __name__ == "__main__":
     import sys
     import glob
     import numpy as np
+    from multiprocessing import Process
 
     try:
         from PIL import Image
@@ -256,7 +330,8 @@ if __name__ == "__main__":
         'binning_factor' : 4,
         'PRINT_SCALEBAR' : False,
         'scalebar_angstroms' : 200, # Angstroms
-        'angpix' : 1.94
+        'angpix' : 1.94,
+        'threads' : 4
         }
     ##################################
 
@@ -267,7 +342,8 @@ if __name__ == "__main__":
      ##    flag      :  (GLOBAL_VARS_key,       data_type,  legal_entries/range,    is_toggle,  has_defaults)
         '--bin'      :  ('binning_factor'   ,    int(),     (1, 999),               False,      True ),
         '--scalebar' :  ('scalebar_angstroms',   int(),     (1, 9999),              False,      True ),
-        '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,      True )
+        '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,      True ),
+        '--j'        :  ('threads',              int(),     (0,999),                False,      True)
     }
 
     EXPECTED_FILES = [  # cmd_line_index,   expected_extension,                         GLOBAL_VARS_key
@@ -289,6 +365,8 @@ if __name__ == "__main__":
         ## check if --scalebar was given as a command, in which case toggle on the flag
         if '--scalebar' in commands:
             GLOBAL_VARS['PRINT_SCALEBAR'] = True
+        if not '--j' in commands:
+            GLOBAL_VARS['threads'] = None
 
     ## print warning if no --angpix is given but --scalebar is (i.e. user may want to use a different pixel size)
     if GLOBAL_VARS['PRINT_SCALEBAR']:
@@ -305,7 +383,38 @@ if __name__ == "__main__":
         ## single image conversion mode
         save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
     else:
-        ## get all files with extension
-        for file in glob.glob("*.mrc"):
-            GLOBAL_VARS['mrc_file'] = file
-            save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
+        if GLOBAL_VARS['threads'] != None:
+            ## permit multithreading
+            threads = GLOBAL_VARS['threads']
+            print(" ... multithreading activated (%s threads) " % threads)
+
+            ## multithreading set up
+            tasks = []
+            for file in glob.glob("*.mrc"):
+                tasks.append(file) ## inputs to the target function
+            task_indicies = np.arange(len(tasks)).tolist() ## will serve as our job id call table
+
+
+            ## prepare all processes by loading the desired arguments
+            processes = []
+            for task in tasks:
+                processes.append(Process(target=save_image, args=(get_mrc_data(task), task, GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix']), daemon = True))
+
+            ## split the workload into logical chunks
+            batches = list(chunks(task_indicies, threads))
+
+            ## dynamically run on multiple threads
+            for batch in batches:
+                print(" >> Starting batch:")
+                ## dynamically launch processes
+                for job in batch:
+                    processes[job].start()
+                ## dynamically have all launched processes join the main thread so it waits before proceeding
+                for job in batch:
+                    processes[job].join(15)
+
+        else:
+            ## get all files with extension
+            for file in glob.glob("*.mrc"):
+                GLOBAL_VARS['mrc_file'] = file
+                save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
