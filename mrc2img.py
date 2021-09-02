@@ -192,10 +192,12 @@ def apply_sigma_contrast(im_data, sigma_value):
     return im_contrast_adjusted
 
 
-def save_image(mrc_data, mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
+def save_image(mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
     check_dependencies()
     # need to recast imported module as the general keyword to use
     import PIL.Image as Image
+
+    mrc_data = get_mrc_data(mrc_filename)
 
     print("mrc_filename = %s" % mrc_filename)
 
@@ -302,7 +304,8 @@ if __name__ == "__main__":
     import sys
     import glob
     import numpy as np
-    from multiprocessing import Process
+    from multiprocessing import Process, Pool
+    import time
 
     try:
         from PIL import Image
@@ -352,6 +355,8 @@ if __name__ == "__main__":
                     ]
     ##################################
 
+    start_time = time.time()
+
     parse_cmd_line(min_input = 1)
 
     ## add a custom checks outside scope of general parser above
@@ -359,14 +364,14 @@ if __name__ == "__main__":
     ## get all commands used
     for n in range(len(sys.argv[1:])+1):
         commands.append(sys.argv[n])
-        ## check if --bin was given as a command, in which case toggle on the flag
-        if '--bin' in commands:
-            GLOBAL_VARS['BIN_IMAGE'] = True
-        ## check if --scalebar was given as a command, in which case toggle on the flag
-        if '--scalebar' in commands:
-            GLOBAL_VARS['PRINT_SCALEBAR'] = True
-        if not '--j' in commands:
-            GLOBAL_VARS['threads'] = None
+    ## check if --bin was given as a command, in which case toggle on the flag
+    if '--bin' in commands:
+        GLOBAL_VARS['BIN_IMAGE'] = True
+    ## check if --scalebar was given as a command, in which case toggle on the flag
+    if '--scalebar' in commands:
+        GLOBAL_VARS['PRINT_SCALEBAR'] = True
+    if not '--j' in commands:
+        GLOBAL_VARS['threads'] = None
 
     ## print warning if no --angpix is given but --scalebar is (i.e. user may want to use a different pixel size)
     if GLOBAL_VARS['PRINT_SCALEBAR']:
@@ -378,10 +383,9 @@ if __name__ == "__main__":
         if not '--angpix' in commands:
             print("!! WARNING: --scalebar was given without an explicit --angpix, using default value of 1.94 Ang/px !!")
 
-
     if not GLOBAL_VARS['BATCH_MODE']:
         ## single image conversion mode
-        save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
+        save_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
     else:
         if GLOBAL_VARS['threads'] != None:
             ## permit multithreading
@@ -392,29 +396,57 @@ if __name__ == "__main__":
             tasks = []
             for file in glob.glob("*.mrc"):
                 tasks.append(file) ## inputs to the target function
-            task_indicies = np.arange(len(tasks)).tolist() ## will serve as our job id call table
 
+            # task_indicies = np.arange(len(tasks)).tolist() ## will serve as our job id call table
+            #
+            #
+            # ## prepare all processes by loading the desired arguments
+            # processes = []
+            # for task in tasks:
+            #     processes.append(Process(target=save_image, args=(task, GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix']), daemon = True))
+            #
+            # ## split the workload into logical chunks
+            # batches = list(chunks(task_indicies, threads))
+            #
+            # ## dynamically run on multiple threads
+            # for batch in batches:
+            #     print(" >> Starting batch:")
+            #     ## dynamically launch processes
+            #     for job in batch:
+            #         processes[job].start()
+            #     ## dynamically have all launched processes join the main thread so it waits before proceeding
+            #     for job in batch:
+            #         processes[job].join(15)
 
-            ## prepare all processes by loading the desired arguments
-            processes = []
-            for task in tasks:
-                processes.append(Process(target=save_image, args=(get_mrc_data(task), task, GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix']), daemon = True))
+            ### update 2021-09-02, try using Pool, which appears to be faster than above manual batching code
+            try:
+                ## define total workset inputs
+                dataset = []
+                for task in tasks:
+                    dataset.append((task, GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix']))
+                ## prepare pool of workers
+                pool = Pool(threads)
+                ## assign workload to pool
+                results = pool.starmap(save_image, dataset)
+                ## close the pool from recieving any other tasks
+                pool.close()
+                ## merge with the main thread, stopping any further processing until workers are complete
+                pool.join()
 
-            ## split the workload into logical chunks
-            batches = list(chunks(task_indicies, threads))
+            except KeyboardInterrupt:
+                print("Multiprocessing run killed")
+                pool.terminate()
 
-            ## dynamically run on multiple threads
-            for batch in batches:
-                print(" >> Starting batch:")
-                ## dynamically launch processes
-                for job in batch:
-                    processes[job].start()
-                ## dynamically have all launched processes join the main thread so it waits before proceeding
-                for job in batch:
-                    processes[job].join(15)
 
         else:
             ## get all files with extension
             for file in glob.glob("*.mrc"):
                 GLOBAL_VARS['mrc_file'] = file
-                save_image(get_mrc_data(GLOBAL_VARS['mrc_file']), GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
+                save_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
+
+    end_time = time.time()
+    total_time_taken = end_time - start_time
+    print("Total time taken to run = %.2f sec" % total_time_taken)
+    ## non-parallelized = 17.08 sec, 16.49 sec, 16.62 sec
+    ## parallized, manual mode = 12.43 sec, 12.95 sec, 12.12 sec
+    ## parallized, pool mode = 8.42 sec, 8.24 sec, 8.2 sec
