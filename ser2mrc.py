@@ -7,6 +7,7 @@
 
 ## 2021-08-25: Script written
 ## 2021-08-28: Updated error handling and command line parsing to make more general/flexible
+## 2021-09-02: Rewrite flow of execution to accomodate parallel processing
 
 #############################
 ###     FLAGS
@@ -32,6 +33,7 @@ def usage():
     print(" Options (defaults in brackets): ")
     print("            --jpg : also save a 4x binned .jpg image of the .MRC file")
     print("    --bin_jpg (4) : adjust the default binning factor of the jpg file")
+    print("          --j (4) : batch mode is optionally multithreaded across given # of cores")
     print("===================================================================================================")
     sys.exit()
 
@@ -128,11 +130,18 @@ def parse_cmd_line(min_input = 1):
             usage()
 
     ## check first if batch mode is being activated, if not then check for the proper file in each argument position
-    if os.path.splitext(cmd_line[1])[0] == '@':
+    if '@' in os.path.splitext(cmd_line[1])[0]:
         GLOBAL_VARS['BATCH_MODE'] = True
         print(" ... batch mode = ON")
+
+        ## if batchmode is active, then confirm the requested filetype is expected
+        if not os.path.splitext(cmd_line[1])[1] in EXPECTED_FILES[1][1]:
+            print(" ERROR :: Requested output filetype (%s) not recognized. Try one of: %s" % (os.path.splitext(cmd_line[1])[1], EXPECTED_FILES[1][1]))
+            sys.exit()
+
     else:
         for index, expected_extension, key in EXPECTED_FILES:
+            parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
             if len(parsed_extension) == 0:
                 print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
                 usage()
@@ -154,6 +163,7 @@ def parse_cmd_line(min_input = 1):
     return
 
 def get_ser_data(file):
+    import serReader
     ## use serReader module to parse the .SER file data into memory
     im = serReader.serReader(file)
     ## get the image data as an np.ndarray of dimension x, y from TIA .SER image
@@ -177,6 +187,14 @@ def save_mrc_image(im_data, output_name):
     return
 
 def save_jpeg_image(mrc_file, binning_factor):
+
+    try:
+        from PIL import Image
+    except:
+        print(" Could not import PIL.Image. Install depenency via:")
+        print(" > pip install --upgrade Pillow")
+        sys.exit()
+
     ## sanity check the binning factor
     try:
         binning_factor = int(binning_factor)
@@ -201,6 +219,47 @@ def save_jpeg_image(mrc_file, binning_factor):
 
     return
 
+def convert_image(ser_file, mrc_file, PRINT_JPEG, jpg_binning):
+    """ To support parallelization, create an `execution' function that can be passed into
+        multiple threads easily with only the necessary input variables
+    """
+    check_dependencies()
+    ## get data from .SER file
+    im_data = get_ser_data(ser_file)
+    ## save the data to a .MRC file
+    save_mrc_image(im_data, mrc_file)
+    ## optionally save a .JPEG file with binning
+    if PRINT_JPEG:
+        save_jpeg_image(mrc_file, jpg_binning)
+    return
+
+
+def check_dependencies():
+    ## load built-in packages, if they fail to load then python install is completely wrong!
+    globals()['sys'] = __import__('sys')
+    globals()['os'] = __import__('os')
+    globals()['glob'] = __import__('glob')
+    globals()['mp'] = __import__('multiprocessing')
+
+    try:
+        globals()['np'] = __import__('numpy') ## similar to: import numpy as np
+    except:
+        print(" ERROR :: Failed to import 'numpy'. Try: pip install numpy")
+        sys.exit()
+
+    try:
+        from PIL import Image
+    except:
+        print(" Could not import PIL.Image. Install depenency via:")
+        print(" > pip install --upgrade Pillow")
+        sys.exit()
+
+    try:
+        globals()['mrcfile'] = __import__('mrcfile') ## similar to: import numpy as np
+    except:
+        print(" ERROR :: Failed to import 'mrcfile'. Try: pip install mrcfile")
+        sys.exit()
+
 
 #############################
 ###     RUN BLOCK
@@ -215,7 +274,8 @@ if __name__ == "__main__":
     import sys
     import glob
     import numpy as np
-
+    import time
+    from multiprocessing import Pool
     try:
         from PIL import Image
     except:
@@ -246,7 +306,8 @@ if __name__ == "__main__":
         'mrc_file' : str(),
         'BATCH_MODE' : False,
         'PRINT_JPEG' : False,
-        'jpg_binning_factor' : 4
+        'jpg_binning_factor' : 4,
+        'threads' : 4
         }
     ##################################
 
@@ -254,9 +315,10 @@ if __name__ == "__main__":
     ## SET UP EXPECTED DATA FOR PARSER
     ##################################
     EXPECTED_FLAGS = {
-     ##    flag      :  (GLOBAL_VARS_key,   data_type,  legal_entries/range,    is_toggle,   has_defaults)
-        '--jpg'      :  ('PRINT_JPEG'   ,    bool(),    (),                     True,       False ),
-        '--bin_jpg'  :  ('jpg_binning_factor',   int(),     (1, 999),            False,      True )
+     ##    flag      :  (GLOBAL_VARS_key,       data_type,  legal_entries/range,    is_toggle,   has_defaults)
+        '--jpg'      :  ('PRINT_JPEG'   ,       bool(),     (),                     True,       False ),
+        '--bin_jpg'  :  ('jpg_binning_factor',   int(),     (1, 999),               False,      True ),
+        '--j'        :  ('threads',              int(),     (0,999),                False,      True)
     }
 
     EXPECTED_FILES = [  # cmd_line_index,   expected_extension,     GLOBAL_VARS_key
@@ -265,41 +327,85 @@ if __name__ == "__main__":
                     ]
     ##################################
 
+    start_time = time.time()
+
     parse_cmd_line(min_input = 1)
+
+    ## add a custom checks outside scope of general parser above
+    commands = []
+    ## get all commands used
+    for n in range(len(sys.argv[1:])+1):
+        commands.append(sys.argv[n])
+
+    if not '--j' in commands:
+        GLOBAL_VARS['threads'] = None
 
     ## single image conversion mode
     if not GLOBAL_VARS['BATCH_MODE']:
 
-        ## get data from .SER file
-        im_data = get_ser_data(GLOBAL_VARS['ser_file'])
-        ## save the data to a .MRC file
-        save_mrc_image(im_data, GLOBAL_VARS['mrc_file'])
-        ## optionally save a .JPEG file with binning
-        if GLOBAL_VARS['PRINT_JPEG']:
-            save_jpeg_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['jpg_binning_factor'])
+        convert_image(GLOBAL_VARS['ser_file'], GLOBAL_VARS['mrc_file'], GLOBAL_VARS['PRINT_JPEG'], GLOBAL_VARS['jpg_binning_factor'])
 
     ## batch image conversion mode
     else:
-        ## get all files with extension
-        for file in glob.glob("*.ser"):
-            ## then run through them one-by-one
-            GLOBAL_VARS['ser_file'] = file
-            current_file_base_name = os.path.splitext(file)[0]
-            GLOBAL_VARS['mrc_file'] = current_file_base_name + ".mrc"
+        if GLOBAL_VARS['threads'] != None:
+            ## permit multithreading
+            threads = GLOBAL_VARS['threads']
+            print(" ... multithreading activated (%s threads) " % threads)
 
-            ## get data from .SER file
-            im_data = get_ser_data(GLOBAL_VARS['ser_file'])
-            ## save the data to a .MRC file
-            save_mrc_image(im_data, GLOBAL_VARS['mrc_file'])
-            ## optionally save a .JPEG file with binning
-            if GLOBAL_VARS['PRINT_JPEG']:
-                save_jpeg_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['jpg_binning_factor'])
+            ## multithreading set up
+            tasks = []
+            for file in glob.glob("*.ser"):
+                tasks.append(file) ## inputs to the target function
 
-            # current_file_base_name = os.path.splitext(file)[0]
-            # ## get data from .SER file
-            # im_data = get_ser_data(file)
-            # ## save the data to a .MRC file
-            # save_mrc_image(im_data, current_file_base_name + ".mrc")
-            # ## optionally save a .JPEG file with binning
-            # if GLOBAL_VARS['PRINT_JPEG']:
-            #     save_jpeg_image(current_file_base_name + ".mrc", GLOBAL_VARS['jpg_binning_factor'])
+            try:
+                ## assign inputs for full dataset
+                dataset = []
+                for task in tasks:
+                    ser_file = task
+                    mrc_file = os.path.splitext(file)[0] + ".mrc"
+                    dataset.append((ser_file, mrc_file, GLOBAL_VARS['PRINT_JPEG'], GLOBAL_VARS['jpg_binning_factor']))
+
+                ## prepare pool of workers
+                pool = Pool(threads)
+                ## assign workload to pool
+                results = pool.starmap(convert_image, dataset)
+                ## close the pool from recieving any other tasks
+                pool.close()
+                ## merge with the main thread, stopping any further processing until workers are complete
+                pool.join()
+
+            except KeyboardInterrupt:
+                print("Multiprocessing run killed")
+                pool.terminate()
+        else:
+            ## get all files with extension
+            for file in glob.glob("*.ser"):
+                ## then run through them one-by-one
+                GLOBAL_VARS['ser_file'] = file
+                current_file_base_name = os.path.splitext(file)[0]
+                GLOBAL_VARS['mrc_file'] = current_file_base_name + ".mrc"
+                convert_image(GLOBAL_VARS['ser_file'], GLOBAL_VARS['mrc_file'], GLOBAL_VARS['PRINT_JPEG'], GLOBAL_VARS['jpg_binning_factor'])
+                #
+                # ## get data from .SER file
+                # im_data = get_ser_data(GLOBAL_VARS['ser_file'])
+                # ## save the data to a .MRC file
+                # save_mrc_image(im_data, GLOBAL_VARS['mrc_file'])
+                # ## optionally save a .JPEG file with binning
+                # if GLOBAL_VARS['PRINT_JPEG']:
+                #     save_jpeg_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['jpg_binning_factor'])
+
+                # current_file_base_name = os.path.splitext(file)[0]
+                # ## get data from .SER file
+                # im_data = get_ser_data(file)
+                # ## save the data to a .MRC file
+                # save_mrc_image(im_data, current_file_base_name + ".mrc")
+                # ## optionally save a .JPEG file with binning
+                # if GLOBAL_VARS['PRINT_JPEG']:
+                #     save_jpeg_image(current_file_base_name + ".mrc", GLOBAL_VARS['jpg_binning_factor'])
+
+
+    end_time = time.time()
+    total_time_taken = end_time - start_time
+    print("Total time taken to run = %.2f sec" % total_time_taken)
+    ## non-parallelized, 4 imgs = ~6.25 sec
+    ## parallized, pool mode, 4 imgs 4 threads = ~ 4 sec

@@ -272,7 +272,7 @@ def check_dependencies():
     globals()['sys'] = __import__('sys')
     globals()['os'] = __import__('os')
     globals()['glob'] = __import__('glob')
-    globals()['mp'] = __import__('multiprocessing') ## similar to: import numpy as np
+    globals()['mp'] = __import__('multiprocessing')
 
     try:
         globals()['np'] = __import__('numpy') ## similar to: import numpy as np

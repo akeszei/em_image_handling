@@ -34,6 +34,10 @@ Batch mode is enabled as above:
 
 `ser2mrc.py   @.mrc `  
 
+Batch mode also permits parallelization, allowing the user to specify `n` cores to launch jobs with:
+
+`ser2mrc.py  @.mrc --j n`
+
 
 ---
 
