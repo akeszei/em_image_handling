@@ -37,24 +37,24 @@ def usage():
     sys.exit()
     return
 
-def read_flag(cmd_line, flag, cmd_line_flag_index, GLOBAL_VARS_key, data_type, legal_entries, is_toggle, has_defaults):
-    global GLOBAL_VARS, EXPECTED_FLAGS
+def read_flag(cmd_line, flag, cmd_line_flag_index, PARAMS_key, data_type, legal_entries, is_toggle, has_defaults):
+    global PARAMS, FLAGS
     ## if the flag serves as a toggle, switch it on and exit
     if is_toggle:
-        GLOBAL_VARS[GLOBAL_VARS_key] = True
-        print(" ... set: %s = %s" % (GLOBAL_VARS_key, True))
+        PARAMS[PARAMS_key] = True
+        print(" ... set: %s = %s" % (PARAMS_key, True))
         return
 
     ## if the flag has a default setting, quickly sanity check if we are using it
     if has_defaults:
         ## if there are no more entries on the command line after the flag, we necessarily are using the defaults
         if len(sys.argv[1:]) <= cmd_line_flag_index:
-            print(" ... use default: %s = %s" % (GLOBAL_VARS_key, GLOBAL_VARS[GLOBAL_VARS_key]))
+            print(" ... use default: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
             return
         else:
             ## check if subsequent entry on cmd line is a flag itself, in which case we are using defaults
-            if cmd_line[cmd_line_flag_index + 1] in EXPECTED_FLAGS:
-                print(" ... use default: %s = %s" % (GLOBAL_VARS_key, GLOBAL_VARS[GLOBAL_VARS_key]))
+            if cmd_line[cmd_line_flag_index + 1] in FLAGS:
+                print(" ... use default: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
                 return
 
     ## sanity check there exists an entry next to the flag before attempting to parse it
@@ -73,8 +73,8 @@ def read_flag(cmd_line, flag, cmd_line_flag_index, GLOBAL_VARS_key, data_type, l
             return
         ## check if the assigned value is in the expected range
         if legal_entries[0] <= user_input <= legal_entries[1]:
-            GLOBAL_VARS[GLOBAL_VARS_key] = user_input
-            print(" ... set: %s = %s" % (GLOBAL_VARS_key, GLOBAL_VARS[GLOBAL_VARS_key]))
+            PARAMS[PARAMS_key] = user_input
+            print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
         else:
             print(" ERROR :: %s flag input (%s) out of expected range: [%s, %s]" % (flag, user_input, legal_entries[0], legal_entries[1]))
             usage()
@@ -89,8 +89,8 @@ def read_flag(cmd_line, flag, cmd_line_flag_index, GLOBAL_VARS_key, data_type, l
             return
         ## check if the assigned value is in the expected range
         if legal_entries[0] <= user_input <= legal_entries[1]:
-            GLOBAL_VARS[GLOBAL_VARS_key] = user_input
-            print(" ... set: %s = %s" % (GLOBAL_VARS_key, GLOBAL_VARS[GLOBAL_VARS_key]))
+            PARAMS[PARAMS_key] = user_input
+            print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
         else:
             print(" ERROR :: %s flag input (%s) out of expected range: [%s, %s]" % (flag, user_input, legal_entries[0], legal_entries[1]))
             usage()
@@ -105,8 +105,8 @@ def read_flag(cmd_line, flag, cmd_line_flag_index, GLOBAL_VARS_key, data_type, l
             return
         ## check if the assigned value is a legal keyword
         if user_input in legal_entries:
-            GLOBAL_VARS[GLOBAL_VARS_key] = user_input
-            print(" ... set: %s = %s" % (GLOBAL_VARS_key, GLOBAL_VARS[GLOBAL_VARS_key]))
+            PARAMS[PARAMS_key] = user_input
+            print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
         else:
             print(" ERROR :: %s flag input (%s) is not a legal entry, try one of: " % (flag, user_input))
             print(legal_entries)
@@ -116,7 +116,7 @@ def read_flag(cmd_line, flag, cmd_line_flag_index, GLOBAL_VARS_key, data_type, l
 def parse_cmd_line(min_input = 1):
     """ min_input = number of command line arguments needed at minimum to run
     """
-    global GLOBAL_VARS, EXPECTED_FLAGS, EXPECTED_FILES
+    global PARAMS, FLAGS, FILES
     ## retrieve all entries on the cmd line and parse them into global variables
     cmd_line = tuple(sys.argv)
     ## check there is a minimum number of arguments input by the user
@@ -130,32 +130,32 @@ def parse_cmd_line(min_input = 1):
 
     ## check first if batch mode is being activated, if not then check for the proper file in each argument position
     if '@' in os.path.splitext(cmd_line[1])[0]:
-        GLOBAL_VARS['BATCH_MODE'] = True
+        PARAMS['BATCH_MODE'] = True
         print(" ... batch mode = ON")
 
         ## if batchmode is active, then confirm the requested filetype is expected
-        if not os.path.splitext(cmd_line[1])[1] in EXPECTED_FILES[1][1]:
-            print(" ERROR :: Requested output filetype (%s) not recognized. Try one of: %s" % (os.path.splitext(cmd_line[1])[1], EXPECTED_FILES[1][1]))
+        if not os.path.splitext(cmd_line[1])[1] in FILES[1][1]:
+            print(" ERROR :: Requested output filetype (%s) not recognized. Try one of: %s" % (os.path.splitext(cmd_line[1])[1], FILES[1][1]))
             sys.exit()
 
     else:
-        for index, expected_extension, key in EXPECTED_FILES:
+        for index, expected_extension, key in FILES:
             parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
             if len(parsed_extension) == 0:
                 print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
                 usage()
             elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
-                GLOBAL_VARS[key] = cmd_line[index]
-                print(" ... %s set: %s" % (key, GLOBAL_VARS[key]))
+                PARAMS[key] = cmd_line[index]
+                print(" ... %s set: %s" % (key, PARAMS[key]))
             else:
                 print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
                 usage()
 
     ## after checking for help flags, try to read in all flags into global dictionary
     for entry in cmd_line:
-        if entry in EXPECTED_FLAGS:
+        if entry in FLAGS:
             # print("Entry found: %s (index %s)" % (entry, cmd_line.index(entry)))
-            read_flag(cmd_line, entry, cmd_line.index(entry), EXPECTED_FLAGS[entry][0], EXPECTED_FLAGS[entry][1], EXPECTED_FLAGS[entry][2], EXPECTED_FLAGS[entry][3], EXPECTED_FLAGS[entry][4])
+            read_flag(cmd_line, entry, cmd_line.index(entry), FLAGS[entry][0], FLAGS[entry][1], FLAGS[entry][2], FLAGS[entry][3], FLAGS[entry][4])
         elif "--" in entry:
             print(" WARNING : unexpected flag detected (%s), may not be correctly assigned." % entry)
 
@@ -196,6 +196,11 @@ def save_image(mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCAL
     check_dependencies()
     # need to recast imported module as the general keyword to use
     import PIL.Image as Image
+
+    ## check file exists in the cwd
+    if not os.path.isfile('./' + mrc_filename):
+        print(" ERROR :: File (%s) does not exist in working directory!" % mrc_filename)
+        sys.exit()
 
     mrc_data = get_mrc_data(mrc_filename)
 
@@ -306,6 +311,7 @@ if __name__ == "__main__":
     import numpy as np
     from multiprocessing import Process, Pool
     import time
+    import cmdline_parser
 
     try:
         from PIL import Image
@@ -325,7 +331,7 @@ if __name__ == "__main__":
     ##################################
     ## ASSIGN DEFAULT VARIABLES
     ##################################
-    GLOBAL_VARS = {
+    PARAMS = {
         'mrc_file' : str(),
         'output_file' : str(),
         'BATCH_MODE' : False,
@@ -334,6 +340,7 @@ if __name__ == "__main__":
         'PRINT_SCALEBAR' : False,
         'scalebar_angstroms' : 200, # Angstroms
         'angpix' : 1.94,
+        'PARALLEL_PROCESSING': False,
         'threads' : 4
         }
     ##################################
@@ -341,40 +348,40 @@ if __name__ == "__main__":
     ##################################
     ## SET UP EXPECTED DATA FOR PARSER
     ##################################
-    EXPECTED_FLAGS = {
-     ##    flag      :  (GLOBAL_VARS_key,       data_type,  legal_entries/range,    is_toggle,  has_defaults)
-        '--bin'      :  ('binning_factor'   ,    int(),     (1, 999),               False,      True ),
-        '--scalebar' :  ('scalebar_angstroms',   int(),     (1, 9999),              False,      True ),
-        '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,      True ),
-        '--j'        :  ('threads',              int(),     (0,999),                False,      True)
+    FLAGS = {
+##    flag      :  (PARAMS_key,       data_type,  legal_entries/range,    toggle for entry,   intrinsic toggle,                    has_defaults)
+    '--bin'      :  ('binning_factor'   ,    int(),     (1, 999),               False,              (True, 'BIN_IMAGE', True),             True ),
+    '--scalebar' :  ('scalebar_angstroms',   int(),     (1, 9999),              False,              (True, 'PRINT_SCALEBAR', True),        True ),
+    '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,              False,                                 True ),
+    '--j'        :  ('threads',              int(),     (0,999),                False,              (True, 'PARALLEL_PROCESSING', True),   True)
     }
 
-    EXPECTED_FILES = [  # cmd_line_index,   expected_extension,                         GLOBAL_VARS_key
-                    (   1,                  '.mrc',                                     'mrc_file'),
-                    (   2,                  ['.jpg', '.jpeg', '.png', '.tif', '.gif'],  'output_file')
-                    ]
+
+    FILES = { ## cmd line index    allowed extensions                          ## can launch batch mode
+        'mrc_file' : (      1,              '.mrc',                                     False),
+        'output_file' : (   2,              ['.jpg', '.jpeg', '.png', '.tif', '.gif'],  True)
+        }
     ##################################
 
     start_time = time.time()
-
-    parse_cmd_line(min_input = 1)
+    PARAMS, EXIT_CODE = cmdline_parser.parse(sys.argv, 1, PARAMS, FLAGS, FILES)
+    if EXIT_CODE < 0:
+        print("Could not correctly parse cmd line")
+    cmdline_parser.print_parameters(PARAMS, sys.argv)
 
     ## add a custom checks outside scope of general parser above
     commands = []
     ## get all commands used
     for n in range(len(sys.argv[1:])+1):
         commands.append(sys.argv[n])
-    ## check if --bin was given as a command, in which case toggle on the flag
-    if '--bin' in commands:
-        GLOBAL_VARS['BIN_IMAGE'] = True
-    ## check if --scalebar was given as a command, in which case toggle on the flag
-    if '--scalebar' in commands:
-        GLOBAL_VARS['PRINT_SCALEBAR'] = True
-    if not '--j' in commands:
-        GLOBAL_VARS['threads'] = None
+    ## check if batch mode was enabled while also providing an explicit input file
+    if commands[1][-4:] == ".mrc":
+        print(" ERROR :: Cannot launch batch mode using `@' symbol while also providing an explicit input file!")
+        print(" Remove the input file and re-run to enable batch mode processing")
+        sys.exit()
 
     ## print warning if no --angpix is given but --scalebar is (i.e. user may want to use a different pixel size)
-    if GLOBAL_VARS['PRINT_SCALEBAR']:
+    if PARAMS['PRINT_SCALEBAR']:
         commands = []
         ## get all commands used
         for n in range(len(sys.argv[1:])+1):
@@ -383,13 +390,16 @@ if __name__ == "__main__":
         if not '--angpix' in commands:
             print("!! WARNING: --scalebar was given without an explicit --angpix, using default value of 1.94 Ang/px !!")
 
-    if not GLOBAL_VARS['BATCH_MODE']:
+    if not PARAMS['BATCH_MODE']:
+        ## warn the user if they activated parallel processing for a single image
+        if '--j' in commands:
+            print(" NOTE: --j flag was set for parallel processing, but without batch mode. Only 1 core can be used for processing a single image.")
         ## single image conversion mode
-        save_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
+        save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
     else:
-        if GLOBAL_VARS['threads'] != None:
+        if PARAMS['PARALLEL_PROCESSING']:
             ## permit multithreading
-            threads = GLOBAL_VARS['threads']
+            threads = PARAMS['threads']
             print(" ... multithreading activated (%s threads) " % threads)
 
             ## multithreading set up
@@ -403,7 +413,7 @@ if __name__ == "__main__":
             # ## prepare all processes by loading the desired arguments
             # processes = []
             # for task in tasks:
-            #     processes.append(Process(target=save_image, args=(task, GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix']), daemon = True))
+            #     processes.append(Process(target=save_image, args=(task, PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix']), daemon = True))
             #
             # ## split the workload into logical chunks
             # batches = list(chunks(task_indicies, threads))
@@ -423,7 +433,7 @@ if __name__ == "__main__":
                 ## define total workset inputs
                 dataset = []
                 for task in tasks:
-                    dataset.append((task, GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix']))
+                    dataset.append((task, PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix']))
                 ## prepare pool of workers
                 pool = Pool(threads)
                 ## assign workload to pool
@@ -441,12 +451,12 @@ if __name__ == "__main__":
         else:
             ## get all files with extension
             for file in glob.glob("*.mrc"):
-                GLOBAL_VARS['mrc_file'] = file
-                save_image(GLOBAL_VARS['mrc_file'], GLOBAL_VARS['output_file'], GLOBAL_VARS['BATCH_MODE'], GLOBAL_VARS['binning_factor'], GLOBAL_VARS['PRINT_SCALEBAR'], GLOBAL_VARS['scalebar_angstroms'], GLOBAL_VARS['angpix'])
+                PARAMS['mrc_file'] = file
+                save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
 
     end_time = time.time()
     total_time_taken = end_time - start_time
-    print("Total time taken to run = %.2f sec" % total_time_taken)
+    print("... runtime = %.2f sec" % total_time_taken)
     ## non-parallelized = 17.08 sec, 16.49 sec, 16.62 sec
     ## parallized, manual mode = 12.43 sec, 12.95 sec, 12.12 sec
     ## parallized, pool mode = 8.42 sec, 8.24 sec, 8.2 sec
