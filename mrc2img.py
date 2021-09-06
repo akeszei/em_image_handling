@@ -37,129 +37,129 @@ def usage():
     sys.exit()
     return
 
-def read_flag(cmd_line, flag, cmd_line_flag_index, PARAMS_key, data_type, legal_entries, is_toggle, has_defaults):
-    global PARAMS, FLAGS
-    ## if the flag serves as a toggle, switch it on and exit
-    if is_toggle:
-        PARAMS[PARAMS_key] = True
-        print(" ... set: %s = %s" % (PARAMS_key, True))
-        return
-
-    ## if the flag has a default setting, quickly sanity check if we are using it
-    if has_defaults:
-        ## if there are no more entries on the command line after the flag, we necessarily are using the defaults
-        if len(sys.argv[1:]) <= cmd_line_flag_index:
-            print(" ... use default: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
-            return
-        else:
-            ## check if subsequent entry on cmd line is a flag itself, in which case we are using defaults
-            if cmd_line[cmd_line_flag_index + 1] in FLAGS:
-                print(" ... use default: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
-                return
-
-    ## sanity check there exists an entry next to the flag before attempting to parse it
-    if len(sys.argv[1:]) <= cmd_line_flag_index:
-        print(" ERROR :: No value provided for flag (%s)" % flag)
-        usage()
-        return
-    ## parse the entry next to the flag depending on its expected type and range
-    ## 1) INTEGERS
-    if isinstance(data_type, int):
-        try:
-            user_input = int(cmd_line[cmd_line_flag_index + 1])
-        except:
-            print(" ERROR :: %s flag requires an integer as input (%s given)" % (flag, cmd_line[cmd_line_flag_index + 1]))
-            usage()
-            return
-        ## check if the assigned value is in the expected range
-        if legal_entries[0] <= user_input <= legal_entries[1]:
-            PARAMS[PARAMS_key] = user_input
-            print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
-        else:
-            print(" ERROR :: %s flag input (%s) out of expected range: [%s, %s]" % (flag, user_input, legal_entries[0], legal_entries[1]))
-            usage()
-            return
-    ## 2) FLOATS
-    if isinstance(data_type, float):
-        try:
-            user_input = float(cmd_line[cmd_line_flag_index + 1])
-        except:
-            print(" ERROR :: %s flag requires a float as input (%s given)" % (flag, cmd_line[cmd_line_flag_index + 1]))
-            usage()
-            return
-        ## check if the assigned value is in the expected range
-        if legal_entries[0] <= user_input <= legal_entries[1]:
-            PARAMS[PARAMS_key] = user_input
-            print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
-        else:
-            print(" ERROR :: %s flag input (%s) out of expected range: [%s, %s]" % (flag, user_input, legal_entries[0], legal_entries[1]))
-            usage()
-            return
-    ## 3) STRINGS
-    if isinstance(data_type, str):
-        try:
-            user_input = cmd_line[cmd_line_flag_index + 1]
-        except:
-            print(" ERROR :: %s flag requires a string as input (%s given)" % (flag, cmd_line[cmd_line_flag_index + 1]))
-            usage()
-            return
-        ## check if the assigned value is a legal keyword
-        if user_input in legal_entries:
-            PARAMS[PARAMS_key] = user_input
-            print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
-        else:
-            print(" ERROR :: %s flag input (%s) is not a legal entry, try one of: " % (flag, user_input))
-            print(legal_entries)
-            usage()
-            return
-
-def parse_cmd_line(min_input = 1):
-    """ min_input = number of command line arguments needed at minimum to run
-    """
-    global PARAMS, FLAGS, FILES
-    ## retrieve all entries on the cmd line and parse them into global variables
-    cmd_line = tuple(sys.argv)
-    ## check there is a minimum number of arguments input by the user
-    if len(cmd_line) - 1 < min_input:
-        usage()
-    ## check for the help flag with elevated priority
-    for entry in cmd_line:
-        if entry in ['-h', '-help', '--h', '--help']:
-            print(' ... help flag called (%s), printing usage and exiting.' % entry)
-            usage()
-
-    ## check first if batch mode is being activated, if not then check for the proper file in each argument position
-    if '@' in os.path.splitext(cmd_line[1])[0]:
-        PARAMS['BATCH_MODE'] = True
-        print(" ... batch mode = ON")
-
-        ## if batchmode is active, then confirm the requested filetype is expected
-        if not os.path.splitext(cmd_line[1])[1] in FILES[1][1]:
-            print(" ERROR :: Requested output filetype (%s) not recognized. Try one of: %s" % (os.path.splitext(cmd_line[1])[1], FILES[1][1]))
-            sys.exit()
-
-    else:
-        for index, expected_extension, key in FILES:
-            parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
-            if len(parsed_extension) == 0:
-                print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
-                usage()
-            elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
-                PARAMS[key] = cmd_line[index]
-                print(" ... %s set: %s" % (key, PARAMS[key]))
-            else:
-                print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
-                usage()
-
-    ## after checking for help flags, try to read in all flags into global dictionary
-    for entry in cmd_line:
-        if entry in FLAGS:
-            # print("Entry found: %s (index %s)" % (entry, cmd_line.index(entry)))
-            read_flag(cmd_line, entry, cmd_line.index(entry), FLAGS[entry][0], FLAGS[entry][1], FLAGS[entry][2], FLAGS[entry][3], FLAGS[entry][4])
-        elif "--" in entry:
-            print(" WARNING : unexpected flag detected (%s), may not be correctly assigned." % entry)
-
-    return
+# def read_flag(cmd_line, flag, cmd_line_flag_index, PARAMS_key, data_type, legal_entries, is_toggle, has_defaults):
+#     global PARAMS, FLAGS
+#     ## if the flag serves as a toggle, switch it on and exit
+#     if is_toggle:
+#         PARAMS[PARAMS_key] = True
+#         print(" ... set: %s = %s" % (PARAMS_key, True))
+#         return
+#
+#     ## if the flag has a default setting, quickly sanity check if we are using it
+#     if has_defaults:
+#         ## if there are no more entries on the command line after the flag, we necessarily are using the defaults
+#         if len(sys.argv[1:]) <= cmd_line_flag_index:
+#             print(" ... use default: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
+#             return
+#         else:
+#             ## check if subsequent entry on cmd line is a flag itself, in which case we are using defaults
+#             if cmd_line[cmd_line_flag_index + 1] in FLAGS:
+#                 print(" ... use default: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
+#                 return
+#
+#     ## sanity check there exists an entry next to the flag before attempting to parse it
+#     if len(sys.argv[1:]) <= cmd_line_flag_index:
+#         print(" ERROR :: No value provided for flag (%s)" % flag)
+#         usage()
+#         return
+#     ## parse the entry next to the flag depending on its expected type and range
+#     ## 1) INTEGERS
+#     if isinstance(data_type, int):
+#         try:
+#             user_input = int(cmd_line[cmd_line_flag_index + 1])
+#         except:
+#             print(" ERROR :: %s flag requires an integer as input (%s given)" % (flag, cmd_line[cmd_line_flag_index + 1]))
+#             usage()
+#             return
+#         ## check if the assigned value is in the expected range
+#         if legal_entries[0] <= user_input <= legal_entries[1]:
+#             PARAMS[PARAMS_key] = user_input
+#             print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
+#         else:
+#             print(" ERROR :: %s flag input (%s) out of expected range: [%s, %s]" % (flag, user_input, legal_entries[0], legal_entries[1]))
+#             usage()
+#             return
+#     ## 2) FLOATS
+#     if isinstance(data_type, float):
+#         try:
+#             user_input = float(cmd_line[cmd_line_flag_index + 1])
+#         except:
+#             print(" ERROR :: %s flag requires a float as input (%s given)" % (flag, cmd_line[cmd_line_flag_index + 1]))
+#             usage()
+#             return
+#         ## check if the assigned value is in the expected range
+#         if legal_entries[0] <= user_input <= legal_entries[1]:
+#             PARAMS[PARAMS_key] = user_input
+#             print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
+#         else:
+#             print(" ERROR :: %s flag input (%s) out of expected range: [%s, %s]" % (flag, user_input, legal_entries[0], legal_entries[1]))
+#             usage()
+#             return
+#     ## 3) STRINGS
+#     if isinstance(data_type, str):
+#         try:
+#             user_input = cmd_line[cmd_line_flag_index + 1]
+#         except:
+#             print(" ERROR :: %s flag requires a string as input (%s given)" % (flag, cmd_line[cmd_line_flag_index + 1]))
+#             usage()
+#             return
+#         ## check if the assigned value is a legal keyword
+#         if user_input in legal_entries:
+#             PARAMS[PARAMS_key] = user_input
+#             print(" ... set: %s = %s" % (PARAMS_key, PARAMS[PARAMS_key]))
+#         else:
+#             print(" ERROR :: %s flag input (%s) is not a legal entry, try one of: " % (flag, user_input))
+#             print(legal_entries)
+#             usage()
+#             return
+#
+# def parse_cmd_line(min_input = 1):
+#     """ min_input = number of command line arguments needed at minimum to run
+#     """
+#     global PARAMS, FLAGS, FILES
+#     ## retrieve all entries on the cmd line and parse them into global variables
+#     cmd_line = tuple(sys.argv)
+#     ## check there is a minimum number of arguments input by the user
+#     if len(cmd_line) - 1 < min_input:
+#         usage()
+#     ## check for the help flag with elevated priority
+#     for entry in cmd_line:
+#         if entry in ['-h', '-help', '--h', '--help']:
+#             print(' ... help flag called (%s), printing usage and exiting.' % entry)
+#             usage()
+#
+#     ## check first if batch mode is being activated, if not then check for the proper file in each argument position
+#     if '@' in os.path.splitext(cmd_line[1])[0]:
+#         PARAMS['BATCH_MODE'] = True
+#         print(" ... batch mode = ON")
+#
+#         ## if batchmode is active, then confirm the requested filetype is expected
+#         if not os.path.splitext(cmd_line[1])[1] in FILES[1][1]:
+#             print(" ERROR :: Requested output filetype (%s) not recognized. Try one of: %s" % (os.path.splitext(cmd_line[1])[1], FILES[1][1]))
+#             sys.exit()
+#
+#     else:
+#         for index, expected_extension, key in FILES:
+#             parsed_extension = os.path.splitext(cmd_line[index])[1].lower()
+#             if len(parsed_extension) == 0:
+#                 print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
+#                 usage()
+#             elif os.path.splitext(cmd_line[index])[1].lower() in expected_extension:
+#                 PARAMS[key] = cmd_line[index]
+#                 print(" ... %s set: %s" % (key, PARAMS[key]))
+#             else:
+#                 print(" ERROR :: Incompatible %s file provided (%s)" % (expected_extension, cmd_line[index]))
+#                 usage()
+#
+#     ## after checking for help flags, try to read in all flags into global dictionary
+#     for entry in cmd_line:
+#         if entry in FLAGS:
+#             # print("Entry found: %s (index %s)" % (entry, cmd_line.index(entry)))
+#             read_flag(cmd_line, entry, cmd_line.index(entry), FLAGS[entry][0], FLAGS[entry][1], FLAGS[entry][2], FLAGS[entry][3], FLAGS[entry][4])
+#         elif "--" in entry:
+#             print(" WARNING : unexpected flag detected (%s), may not be correctly assigned." % entry)
+#
+#     return
 
 def get_mrc_data(file):
     """ file = .mrc file
