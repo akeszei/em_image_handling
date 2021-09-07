@@ -366,7 +366,7 @@ if __name__ == "__main__":
                 dataset = []
                 for task in tasks:
                     ser_file = task
-                    mrc_file = os.path.splitext(file)[0] + ".mrc"
+                    mrc_file = os.path.splitext(task)[0] + ".mrc"
                     dataset.append((ser_file, mrc_file, PARAMS['PRINT_JPEG'], PARAMS['jpg_binning_factor']))
 
                 ## prepare pool of workers
