@@ -35,7 +35,7 @@ def get_ser_data(file, HEADER_INFO):
 
     HEADER_INFO['image_dimensions'] = ser['data'].shape
     HEADER_INFO['angpix'] = "{0:.4g}".format(ser['pixelSizeX'] * 10**10)
-    HEADER_INFO['fname'] = file
+    HEADER_INFO['filename'] = file
     HEADER_INFO['min'] = ser['data'].min()
     HEADER_INFO['max'] = ser['data'].max()
     HEADER_INFO['mean'] = ser['data'].mean()
@@ -44,7 +44,7 @@ def get_ser_data(file, HEADER_INFO):
 def get_mrc_data(file, HEADER_INFO):
     with mrcfile.open(file) as mrc:
         HEADER_INFO['image_dimensions'] = '(%s, %s, %s)' % (mrc.header.nx, mrc.header.ny, mrc.header.nz)
-        HEADER_INFO['fname'] = file
+        HEADER_INFO['filename'] = file
         HEADER_INFO['angpix'] = mrc.voxel_size.x
         HEADER_INFO['min'] = mrc.header.dmin
         HEADER_INFO['max'] = mrc.header.dmax
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
     ## prepare a general header dictionary we want to populate
     HEADER_INFO = {
-        'fname' : '',
+        'filename' : '',
         'angpix' : '',
         'image_dimensions' : '',
         'min' : '',
