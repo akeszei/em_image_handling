@@ -38,6 +38,12 @@ Batch mode also permits parallelization, allowing the user to specify `n` cores 
 
 `ser2mrc.py  @.mrc --j n`
 
+-----
+#### em_header.py
+Work-in-progress. Read in a `.ser` or `.mrc` file and print out header info for the user.
+
+`em_header.py <.ser/.mrc file>`
+
 
 ---
 
