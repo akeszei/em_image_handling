@@ -166,7 +166,7 @@ def parse_flag(cmdline, index, PARAMS, flag_options, FLAGS, FILES):
                     print("  >> set '%s' = '%s'" % (PARAM_key, PARAMS[PARAM_key]))
             else:
                 ## otherwise throw error
-                print(" ERROR :: Could not cast '%s' as correct type" % string )
+                print(" ERROR :: Could not cast '%s' as correct type" % string_to_parse )
                 return PARAMS, EXIT_CODE
         else:
             ## if we cast correctly, then proceed with trying to read in the input
