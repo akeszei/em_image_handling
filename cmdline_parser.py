@@ -10,7 +10,7 @@ import glob
 ##################################
 ## FLAGS
 ##################################
-DEBUG = True
+DEBUG = False
 
 ##################################
 ## FUNCTIONS
@@ -43,7 +43,8 @@ def parse(cmdline, min_args, PARAMS, FLAGS, FILES):
             extensions = make_list(extensions)
         for allowed_extension in extensions:
             for cmd in cmdline:
-                print("CHECK BATCH MODE = ", cmd, allowed_extension)
+                if DEBUG:
+                    print("CHECK BATCH MODE, cmd = %s; allowed_extension = %s " % (cmd, allowed_extension))
                 if len(cmd) > 4: ## lowest cmd size is 5, e.g.: '@.ext'
                     if cmd[-5:] == '@' + allowed_extension:
                         PARAMS['BATCH_MODE'] = True

@@ -375,7 +375,7 @@ if __name__ == "__main__":
     for n in range(len(sys.argv[1:])+1):
         commands.append(sys.argv[n])
     ## check if batch mode was enabled while also providing an explicit input file
-    if commands[1][-4:] == ".mrc":
+    if PARAMS['BATCH_MODE'] and commands[1][-4:] == ".mrc":
         print(" ERROR :: Cannot launch batch mode using `@' symbol while also providing an explicit input file!")
         print(" Remove the input file and re-run to enable batch mode processing")
         sys.exit()
