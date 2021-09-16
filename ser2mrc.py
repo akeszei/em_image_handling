@@ -205,7 +205,9 @@ def save_jpeg_image(mrc_file, binning_factor):
         ## rescale the image data to grayscale range (0,255)
         remapped = (255*(mrc.data - np.min(mrc.data))/np.ptp(mrc.data)).astype(np.uint8) ## remap data from 0 -- 255
         ## load the image data into a PIL.Image object
-        im = Image.fromarray(remapped).convert('RGB')
+        im = Image.fromarray(remapped).convert('L')
+        ## adjust the contrast
+        im = sigma_contrast(im, 3)
         ## bin the image to the desired size
         resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
         jpg_name = os.path.splitext(mrc_file)[0] + '.jpg'
@@ -217,6 +219,23 @@ def save_jpeg_image(mrc_file, binning_factor):
         print("    >> .jpg written: %s (%s x binning)" % (jpg_name, binning_factor))
 
     return
+
+def sigma_contrast(im_array, sigma):
+    """ Rescale the image intensity levels to a range defined by a sigma value (the # of
+        standard deviations to keep). Can perform better than auto_contrast when there is
+        a lot of dark pixels throwing off the level balancing.
+    """
+    stdev = np.std(im_array)
+    mean = np.mean(im_array)
+    print("Image intensity data (mean, stdev) = (%s, %s)" % (mean, stdev))
+    minval = mean - (stdev * sigma)
+    maxval = mean + (stdev * sigma)
+    ## remove pixles above/below the defined limits
+    im_array = np.clip(im_array, minval, maxval)
+    ## rescale the image into the range 0 - 255
+    im_array = ((im_array - minval) / (maxval - minval)) * 255
+
+    return im_array
 
 def convert_image(ser_file, mrc_file, PRINT_JPEG, jpg_binning):
     """ To support parallelization, create an `execution' function that can be passed into
@@ -231,7 +250,6 @@ def convert_image(ser_file, mrc_file, PRINT_JPEG, jpg_binning):
     if PRINT_JPEG:
         save_jpeg_image(mrc_file, jpg_binning)
     return
-
 
 def check_dependencies():
     ## load built-in packages, if they fail to load then python install is completely wrong!
