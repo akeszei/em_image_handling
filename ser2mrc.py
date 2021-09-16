@@ -316,8 +316,8 @@ if __name__ == "__main__":
     ## SET UP EXPECTED DATA FOR PARSER
     ##################################
     FLAGS = {
-##    flag      :  (PARAMS_key,       data_type,  legal_entries/range,    toggle for entry,   intrinsic toggle,                    has_defaults)
-    '--jpg'      :  ('jpg_binning_factor', int(), (1,999), True, (True, 'PRINT_JPEG', True), True),
+##    flag      :  (PARAMS_key,   data_type,  legal_entries/range,  is entry a toggle,  intrinsic toggle, has_defaults)
+    '--jpg'      :  ('jpg_binning_factor', int(), (1,999), False, (True, 'PRINT_JPEG', True), True),
     # '--bin_jpg'  :  ('jpg_binning_factor',   int(),     (1, 999),               False,      True ),
     '--j'        :  ('threads', int(), (1,999), False, (True, 'PARALLEL_PROCESSING', True), True)
     }
