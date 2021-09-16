@@ -183,7 +183,6 @@ def apply_sigma_contrast(im_data, sigma_value):
     ## 2. find the mean of the dataset
     im_mean = np.mean(im_data)
     ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
-    sigma_contrast = 3.5 ## set the limits of the pixel values we want for min and max
     min = im_mean - (sigma_contrast * im_stdev)
     max = im_mean + (sigma_contrast * im_stdev)
     ## 4. clip the dataset to the min and max values
