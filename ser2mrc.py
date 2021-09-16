@@ -204,12 +204,12 @@ def save_jpeg_image(mrc_file, binning_factor):
     with mrcfile.open(mrc_file) as mrc:
         ## rescale the image data to grayscale range (0,255)
         remapped = (255*(mrc.data - np.min(mrc.data))/np.ptp(mrc.data)).astype(np.uint8) ## remap data from 0 -- 255
+        ## adjust the contrast
+        remapped = sigma_contrast(remapped, 3)
         ## load the image data into a PIL.Image object
         im = Image.fromarray(remapped).convert('L')
         ## bin the image to the desired size
         resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
-        ## adjust the contrast
-        resized_im = sigma_contrast(resized_im, 3)
         jpg_name = os.path.splitext(mrc_file)[0] + '.jpg'
         # im.show()
         ## save the image to disc
