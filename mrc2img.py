@@ -207,7 +207,7 @@ def save_image(mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCAL
     print("mrc_filename = %s" % mrc_filename)
 
     ## apply sigma contrast to the image
-    im_contrast_adjusted = apply_sigma_contrast(mrc_data, 3.5)
+    im_contrast_adjusted = apply_sigma_contrast(mrc_data, 3)
 
     ## rescale the image data to grayscale range (0,255)
     remapped = (255*(im_contrast_adjusted - np.min(im_contrast_adjusted))/np.ptp(im_contrast_adjusted)).astype(np.uint8) ## remap data from 0 -- 255
