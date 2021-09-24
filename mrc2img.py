@@ -191,7 +191,7 @@ def apply_sigma_contrast(im_data, sigma_value):
     return im_contrast_adjusted
 
 
-def save_image(mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
+def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
     check_dependencies()
     # need to recast imported module as the general keyword to use
     import PIL.Image as Image
@@ -223,8 +223,11 @@ def save_image(mrc_filename, output_file, BATCH_MODE, binning_factor, PRINT_SCAL
     else:
         img_name = output_file
 
-    ## bin the image to the desired size
-    resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
+    if BIN_IMAGE:
+        ## bin the image to the desired size
+        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
+    else:
+        resized_im = im
 
     # make a scalebar if requested
     if PRINT_SCALEBAR:
@@ -395,7 +398,7 @@ if __name__ == "__main__":
         if '--j' in commands:
             print(" NOTE: --j flag was set for parallel processing, but without batch mode. Only 1 core can be used for processing a single image.")
         ## single image conversion mode
-        save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
+        save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
     else:
         if PARAMS['PARALLEL_PROCESSING']:
             ## permit multithreading
@@ -433,7 +436,7 @@ if __name__ == "__main__":
                 ## define total workset inputs
                 dataset = []
                 for task in tasks:
-                    dataset.append((task, PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix']))
+                    dataset.append((task, PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix']))
                 ## prepare pool of workers
                 pool = Pool(threads)
                 ## assign workload to pool
@@ -452,7 +455,7 @@ if __name__ == "__main__":
             ## get all files with extension
             for file in glob.glob("*.mrc"):
                 PARAMS['mrc_file'] = file
-                save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
+                save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
 
     end_time = time.time()
     total_time_taken = end_time - start_time
