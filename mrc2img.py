@@ -183,8 +183,8 @@ def apply_sigma_contrast(im_data, sigma_value):
     ## 2. find the mean of the dataset
     im_mean = np.mean(im_data)
     ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
-    min = im_mean - (sigma_contrast * im_stdev)
-    max = im_mean + (sigma_contrast * im_stdev)
+    min = im_mean - (sigma_value * im_stdev)
+    max = im_mean + (sigma_value * im_stdev)
     ## 4. clip the dataset to the min and max values
     im_contrast_adjusted = np.clip(im_data, min, max)
 
@@ -365,7 +365,8 @@ if __name__ == "__main__":
     start_time = time.time()
     PARAMS, EXIT_CODE = cmdline_parser.parse(sys.argv, 1, PARAMS, FLAGS, FILES)
     if EXIT_CODE < 0:
-        print("Could not correctly parse cmd line")
+        usage()
+        sys.exit()
     cmdline_parser.print_parameters(PARAMS, sys.argv)
 
     ## add a custom checks outside scope of general parser above
