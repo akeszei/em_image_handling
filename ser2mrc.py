@@ -227,7 +227,7 @@ def sigma_contrast(im_array, sigma):
     """
     stdev = np.std(im_array)
     mean = np.mean(im_array)
-    print("Image intensity data (mean, stdev) = (%s, %s)" % (mean, stdev))
+    # print("Image intensity data (mean, stdev) = (%s, %s)" % (mean, stdev))
     minval = mean - (stdev * sigma)
     maxval = mean + (stdev * sigma)
     ## remove pixles above/below the defined limits
