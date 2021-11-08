@@ -6,7 +6,7 @@
 
     Typical usage is taking a 'continuous' movie with TIA and then manually
     stopping it. The output movie can then be used with this script using
-    only the chosen starting frames. 
+    only the chosen starting frames.
 """
 
 ## 2021-10-27: Script started
