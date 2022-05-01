@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-## Written by: Alexander Keszei 
+## Written by: Alexander Keszei
 ## 2022-05-01: mrcs_viewer.py version 1 complete
 ## TO DO
 ## - Clean up code for scrollbar (pack it only in the initialize_canvases function, not also in __init__, no?)
@@ -20,51 +20,6 @@ def usage():
     print("================================================================================================")
     sys.exit()
     return
-
-def parse_cmdline(cmdline):
-    ## DEFAULTS
-    input_mrcs = None
-    scale = 1
-    max_frames = 50
-    columns = 8
-
-    ## CHECK FOR HELP FLAG
-    for cmd in cmdline:
-        if cmd in ["--h", "-h"]:
-            usage()
-
-    ## PASS THROUGH EACH COMMAND AND PARSE THEM IF POSSIBLE
-    i = 0
-    for cmd in cmdline:
-        if ".mrcs" in cmd.lower():
-            if cmd[-5:] == ".mrcs":
-                input_mrcs = cmd
-        if cmd == "--scale":
-            if len(cmdline) >= i + 2:
-                scale = float(cmdline[i+1])
-            else:
-                print(" ERROR :: %s flag called, but no value passed in")
-        if cmd == "--max_frames":
-            max_frames = int(cmdline[i+1])
-        if cmd == "--cols":
-            columns = int(cmdline[i+1])
-        i += 1
-
-    ## SANITY CHECK INPUT MRCS
-    if input_mrcs == None:
-        print(" ERROR :: No proper input .MRCS was detected.")
-        usage()
-
-    if DEBUG:
-        print(" Input options:")
-        print("   >> input_mrcs = %s" % input_mrcs)
-        print("   >> scale = %s" % scale)
-        print("   >> max_frames = %s" % max_frames)
-        print("   >> columns = %s" % columns)
-        print("-------------------------------------------------------------")
-
-    return input_mrcs, scale, max_frames, columns
-
 
 def make_empty_mrcs(stack_size, mrc_dimensions, fname):
     """ Prepare an empty .MRCS in memory of the correct dimensionality
