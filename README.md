@@ -1,4 +1,4 @@
-# em_image_conversion
+# em_image_handling
 Scripts to manipulate or convert EM image formats.
 
 ## Usages
