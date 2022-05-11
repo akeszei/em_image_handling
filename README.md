@@ -59,8 +59,6 @@ Can optionally load up the program passing in custom options rather than using t
 #### mrc_viewer.py
 Tk-based program for easy viewing/analysing of `.mrc` images. Commonly desired functions for single particle analysis are available, including: inspecting the image FFT, highlighting particles by picking, lowpass filtering, sigma contrast, adding scalebar, and printing the marked up image out as a `.jpg`. Launch the program in your working directory, or use the menu bar to open a specific image and its directory. Left and right-arrow keys will sequentially load images in the directory, or a specific filename can be input by the user.
 
-`mrc_viewer.py`
-
 ---
 
 ## Dependencies
