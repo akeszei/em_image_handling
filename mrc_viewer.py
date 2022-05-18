@@ -179,8 +179,10 @@ def get_mrc_raw_data(file):
     """ file = .mrc file
         returns np.ndarray of the mrc data using mrcfile module
     """
+    ## NOTE atm works for mrc mode 2 but not mode 6
     with mrcfile.open(file) as mrc:
-        image_data = mrc.data
+        image_data = mrc.data.astype(np.float32) ## need to cast it as a float32, since some mrc formats are uint16! (i.e. mode 6)
+        # print("mrc dtype = ", type(image_data.dtype))
         pixel_size = np.around(mrc.voxel_size.item(0)[0], decimals = 2)
     if DEBUG:
         print(" Opening %s" % file)
@@ -191,8 +193,10 @@ def get_mrc_raw_data(file):
 def mrc2grayscale(mrc_raw_data, pixel_size, lowpass_threshold):
     """ Convert raw mrc data into a grayscale numpy array suitable for display
     """
+    # print(" min, max = %s, %s" % (np.min(mrc_raw_data), np.max(mrc_raw_data)))
     ## remap the mrc data to grayscale range
     remapped = (255*(mrc_raw_data - np.min(mrc_raw_data))/np.ptp(mrc_raw_data)).astype(np.uint8) ## remap data from 0 -- 255 as integers
+
     ## lowpass filter the image by the given threshold
     lowpassed, ctf = lowpass(remapped, lowpass_threshold, pixel_size)
 
