@@ -166,7 +166,8 @@ def get_mrc_data(file):
         returns np.ndarray of the mrc data using mrcfile module
     """
     with mrcfile.open(file) as mrc:
-        image_data = mrc.data
+        # image_data = mrc.data
+        image_data = mrc.data.astype(np.float32)
     return image_data
 
 def apply_sigma_contrast(im_data, sigma_value):
