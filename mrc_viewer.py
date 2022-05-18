@@ -1054,7 +1054,8 @@ if __name__ == '__main__':
     # import copy
     import mrcfile
     import cv2 ## for resizing images with a scaling factor
-    from PIL import ImageGrab
+    # from PIL import ImageGrab ## ImageGrab from PIL does not work for Linux, use pyscreenshot (pip install pyscreenshot)
+    import pyscreenshot as ImageGrab
 
     usage()
     root = tk.Tk()
