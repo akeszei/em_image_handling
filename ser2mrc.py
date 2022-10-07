@@ -89,7 +89,7 @@ def save_jpeg_image(mrc_file, binning_factor):
         ## load the image data into a PIL.Image object
         im = Image.fromarray(remapped).convert('L')
         ## bin the image to the desired size
-        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
+        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.Resampling.BILINEAR)
         jpg_name = os.path.splitext(mrc_file)[0] + '.jpg'
         # im.show()
         ## save the image to disc
@@ -180,6 +180,11 @@ if __name__ == "__main__":
         print(" Could not import PIL.Image. Install depenency via:")
         print(" > pip install --upgrade Pillow")
         sys.exit()
+    if int(Image.__version__.split('.')[0]) < 9:
+        print(" This script requires Pillow version 9+")
+        print(" ... detected version = %s" % Image.__version__)
+        print(" Try upgrading vis:")
+        print("  > pip install pillow --upgrade")
 
     try:
         import mrcfile
