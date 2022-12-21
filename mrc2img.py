@@ -74,7 +74,6 @@ def apply_sigma_contrast(im_data, sigma_value):
 
     return im_contrast_adjusted
 
-
 def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, input_angpix):
     check_dependencies()
     # need to recast imported module as the general keyword to use
@@ -140,7 +139,6 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
 
     return
 
-
 def add_scalebar(image_obj, scalebar_px):
     """ Adds a scalebar to the input image and returns a new edited image
     """
@@ -163,7 +161,6 @@ def add_scalebar(image_obj, scalebar_px):
         for y in range(y_range[0], y_range[1]):
             image_obj.putpixel((x, y), (255, 255, 255))
     return image_obj
-
 
 def chunks(l, n):
     """Yield successive n-sized chunks from l."""
