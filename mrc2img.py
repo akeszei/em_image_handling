@@ -92,13 +92,12 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         angpix = input_angpix
     else:
         angpix = mrc_pixel_size
+        print(" Unexpected pixel size given (%s), detected pixel size from file used (%s)" % (input_angpix, angpix))
 
     ## if after above code runs pixel size does not yet make sense then set an arbitrary default and turn off functions that require angpix 
-    if angpix <= 0:
+    if angpix <= 0 and PRINT_SCALEBAR:
+        print(" Unexpected pixel size after parsing. Cannot print scalebar despite flag given!")
         PRINT_SCALEBAR = False
-
-    print("mrc_filename = %s" % mrc_filename)
-    print("pixel size = %s" % angpix)
 
     ## apply sigma contrast to the image
     im_contrast_adjusted = apply_sigma_contrast(mrc_data, 3)
@@ -122,7 +121,9 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         ## bin the image to the desired size
         resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
     else:
+        ## if no --bin flag is given, set the binning factor to 1 instead of the default 4
         resized_im = im
+        binning_factor = 1
 
     # make a scalebar if requested
     if PRINT_SCALEBAR:
@@ -148,7 +149,7 @@ def add_scalebar(image_obj, scalebar_px):
     stroke = int(image_obj.height * 0.005)
     if stroke < 1:
         stroke = 1
-    print("Scale bar info: (offset px, stroke) = (%s, %s)" % (indent_px, stroke))
+    print(" Scale bar info: (length px, offset px, stroke) = (%s, %s, %s)" % (scalebar_px, indent_px, stroke))
     ## find the pixel range for the scalebar, typically 5 x 5 pixels up from bottom left
     LEFT_INDENT = indent_px # px from left to indent the scalebar
     BOTTOM_INDENT = indent_px # px from bottom to indent the scalebar
@@ -284,7 +285,7 @@ if __name__ == "__main__":
             commands.append(sys.argv[n])
         ## check if --angpix was given
         if not '--angpix' in commands:
-            print("!! WARNING: --scalebar was given without an explicit --angpix, using default value of 1.94 Ang/px !!")
+            print("!! WARNING: --scalebar was given without an explicit --angpix, will try to parse from file instead !!")
 
     if not PARAMS['BATCH_MODE']:
         ## warn the user if they activated parallel processing for a single image

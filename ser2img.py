@@ -23,7 +23,7 @@ def usage():
     print(" Convert .SER 2D EM images to conventional image formats (.PNG, .TIF, .GIF).")
     print(" Options include binning and addition of a scalebar of specified size.")
     print(" Usage:")
-    print("    $ ser2img.py  input.mrc  output.jpg/png/tif/gif  <options> ")
+    print("    $ ser2img.py  input.ser  output.jpg/png/tif/gif  <options> ")
     print(" Batch mode:")
     print("    $ ser2img.py  @.jpg/png/tif/gif")
     print("------------------------------------------------------------------------------------------------")
@@ -47,7 +47,11 @@ def get_ser_data(file):
     im_data = im['data']
     ## recast the int32 data coming out of serReader into float32 for use as mrc mode #2
     im_float32 = im_data.astype(np.float32)
-    return im_float32
+
+    ## grab useful metadata
+    pixel_size = float("{0:.4g}".format(im['pixelSizeX'] * 10**10))
+
+    return im_float32, pixel_size
 
 def apply_sigma_contrast(im_data, sigma_value):
     """
@@ -71,7 +75,7 @@ def apply_sigma_contrast(im_data, sigma_value):
     return im_contrast_adjusted
 
 
-def save_image(ser_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, angpix):
+def save_image(ser_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, input_angpix):
     check_dependencies()
     # need to recast imported module as the general keyword to use
     import PIL.Image as Image
@@ -81,9 +85,8 @@ def save_image(ser_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         print(" ERROR :: File (%s) does not exist in working directory!" % ser_filename)
         sys.exit()
 
-    ser_data = get_ser_data(ser_filename)
-
-    print("ser_filename = %s" % ser_filename)
+    ser_data, ser_pixel_size = get_ser_data(ser_filename)
+    # print(" ser_filename = %s" % ser_filename)
 
     ## apply sigma contrast to the image
     im_contrast_adjusted = apply_sigma_contrast(ser_data, 3)
@@ -93,6 +96,18 @@ def save_image(ser_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
 
     ## load the image data into a PIL.Image object
     im = Image.fromarray(remapped).convert('RGB')
+
+    ## check if a logical angpix value was given (default is -1) and use that instead, otherwise use value read from mrc file
+    if input_angpix > 0:
+        angpix = input_angpix
+    else:
+        angpix = ser_pixel_size
+        print(" Unexpected pixel size given (%s), detected pixel size from file used (%s)" % (input_angpix, angpix))
+
+    ## if after above code runs pixel size does not yet make sense then set an arbitrary default and turn off functions that require angpix 
+    if angpix <= 0 and PRINT_SCALEBAR:
+        print(" Unexpected pixel size after parsing. Cannot print scalebar despite flag given!")
+        PRINT_SCALEBAR = False
 
     ## figure out the name of the file
     if BATCH_MODE:
@@ -108,6 +123,7 @@ def save_image(ser_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
     else:
         resized_im = im
+        binning_factor = 1
 
     # make a scalebar if requested
     if PRINT_SCALEBAR:
@@ -134,7 +150,7 @@ def add_scalebar(image_obj, scalebar_px):
     stroke = int(image_obj.height * 0.005)
     if stroke < 1:
         stroke = 1
-    print("Scale bar info: (offset px, stroke) = (%s, %s)" % (indent_px, stroke))
+    print(" Scale bar info: (length px, offset px, stroke) = (%s, %s, %s)" % (scalebar_px, indent_px, stroke))
     ## find the pixel range for the scalebar, typically 5 x 5 pixels up from bottom left
     LEFT_INDENT = indent_px # px from left to indent the scalebar
     BOTTOM_INDENT = indent_px # px from bottom to indent the scalebar
@@ -221,7 +237,7 @@ if __name__ == "__main__":
         'binning_factor' : 4,
         'PRINT_SCALEBAR' : False,
         'scalebar_angstroms' : 200, # Angstroms
-        'angpix' : 1.94,
+        'angpix' : -1,
         'PARALLEL_PROCESSING': False,
         'threads' : 4
         }
@@ -271,7 +287,7 @@ if __name__ == "__main__":
             commands.append(sys.argv[n])
         ## check if --angpix was given
         if not '--angpix' in commands:
-            print(" !! WARNING: --scalebar was given without an explicit --angpix, using default value of 1.94 Ang/px !!")
+            print(" !! WARNING: --scalebar was given without an explicit --angpix, will try finding value from file itself !!")
 
     if not PARAMS['BATCH_MODE']:
         ## warn the user if they activated parallel processing for a single image
