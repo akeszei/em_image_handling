@@ -120,7 +120,7 @@ def save_image(ser_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
 
     if BIN_IMAGE:
         ## bin the image to the desired size
-        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
+        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.Resampling.BILINEAR)
     else:
         resized_im = im
         binning_factor = 1

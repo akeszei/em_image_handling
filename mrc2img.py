@@ -119,7 +119,7 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
 
     if BIN_IMAGE:
         ## bin the image to the desired size
-        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.BILINEAR)
+        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.Resampling.BILINEAR)
     else:
         ## if no --bin flag is given, set the binning factor to 1 instead of the default 4
         resized_im = im
