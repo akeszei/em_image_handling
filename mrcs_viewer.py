@@ -21,20 +21,33 @@ def usage():
     sys.exit()
     return
 
-def make_empty_mrcs(stack_size, mrc_dimensions, fname):
+def make_empty_mrcs(stack_size, mrc_dimensions, dtype, fname):
     """ Prepare an empty .MRCS in memory of the correct dimensionality
     """
     with mrcfile.new(fname, overwrite=True) as mrcs:
         mrcs.set_data(np.zeros(( stack_size, ## stack size
                                 mrc_dimensions[1], ## pixel height, 'Y'
                                 mrc_dimensions[0]  ## pixel length, 'X'
-                            ), dtype=np.int16))
+                                ), dtype=np.dtype(getattr(np, str(dtype)))
+                            ))
 
         ## set the mrcfile with the correct header values to indicate it is an image stack
         mrcs.set_image_stack()
         if DEBUG:
-            print(" empty mrcs created = ", mrcs.data.shape)
+            print(" empty mrcs created = ", mrcs.data.shape, mrcs.data[0].dtype)
     return
+
+def get_mrcs_dtype(fname):
+    """
+    """
+    with mrcfile.open(fname, mode='r') as mrc:
+        ## open first frame and read dtype 
+        input_dtype = mrc.data.dtype
+
+    if DEBUG:
+        print(" ... input .MRCS dtype = %s" % input_dtype)
+    return input_dtype
+
 
 def get_mrcs_dimensions(fname):
     """
@@ -45,8 +58,11 @@ def get_mrcs_dimensions(fname):
             y_dim, x_dim = mrc.data.shape[0], mrc.data.shape[1]
             z_dim = 1
         else:
-            # X axis is always the last in shape (see: https://mrcfile.readthedocs.io/en/latest/usage_guide.html)
+            ## X axis is always the last in shape (see: https://mrcfile.readthedocs.io/en/latest/usage_guide.html)
             y_dim, x_dim, z_dim = mrc.data.shape[1], mrc.data.shape[2], mrc.data.shape[0]
+
+        ## can read pixel size        
+        # print(mrc.voxel_size)
     if DEBUG:
         print(" ... input .MRCS frame dimensions (x, y, z) = (%s, %s, %s)" % (x_dim, y_dim, z_dim))
     return x_dim, y_dim, z_dim
@@ -68,6 +84,8 @@ def write_chosen_frames_to_empty_mrcs(input_mrcs_fname, chosen_frames, output_mr
         ## sanity check there is a frame expected
         if frame_num in range(0, input_mrcs.data.shape[0]):
             frame_data = input_mrcs.data[frame_num]
+            if DEBUG:
+                print("Data read from file = (min, max) -> (%s, %s), dtype = %s" % (np.min(frame_data), np.max(frame_data), frame_data.dtype))
 
             ## need to deal with single frame as a special case since array shape changes format
             if len(chosen_frames) == 1:
@@ -75,6 +93,8 @@ def write_chosen_frames_to_empty_mrcs(input_mrcs_fname, chosen_frames, output_mr
             else:
                 ## pass the frame data into the next available frame of the output mrcs
                 output_mrcs.data[i] = frame_data
+                if DEBUG:
+                    print("Data written to file = (min, max) -> (%s, %s), dtype = %s" % (np.min(output_mrcs.data[i]), np.max(output_mrcs.data[i]), output_mrcs.data[i].dtype))
         else:
             print(" Input frame value requested (%s) not in expected range of .MRCS input file: (%s; [%s, %s])" % (frame_num, input_mrcs_fname, 1, input_mrcs.data.shape[0]))
 
@@ -206,6 +226,7 @@ class MainUI:
         self.master.bind("<F1>", lambda event: self.update_canvases())
         self.master.bind("<F2>", lambda event: self.redraw_canvases())
         self.master.bind('<Control-KeyRelease-s>', lambda event: self.save_selected_mrcs())
+        self.master.bind('<Control-KeyRelease-q>', lambda event: self.quit())
 
         ## Panel Instances
         self.optionPanel_instance = None
@@ -291,8 +312,11 @@ class MainUI:
                 chosen_frames.append(frame_num)
             frame_num += 1
 
+        ## determine the dtype of the array 
+        input_dtype = get_mrcs_dtype(self.input_mrcs)
+
         if stack_size > 0:
-            make_empty_mrcs(stack_size, (mrc_dimensions[0], mrc_dimensions[1]), output_mrcs_name)
+            make_empty_mrcs(stack_size, (mrc_dimensions[0], mrc_dimensions[1]), input_dtype, output_mrcs_name)
             write_chosen_frames_to_empty_mrcs(self.input_mrcs, chosen_frames, output_mrcs_name)
             print(" Written %s frames to: %s" % (stack_size, output_mrcs_name))
         else:
@@ -301,7 +325,6 @@ class MainUI:
         return
 
     def toggle_canvas(self, canvas_obj):
-        ## WIP
         ## get the index of the canvas
         index = 0
         for c, img in self.canvas_data:
@@ -318,6 +341,9 @@ class MainUI:
 
         # print(self.toggled_canvases)
         self.redraw_canvas_toggles()
+
+        ## return focus to the master 
+        self.master.focus
         return
 
     def redraw_canvas_toggles(self):
