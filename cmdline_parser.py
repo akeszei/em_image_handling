@@ -79,7 +79,7 @@ def parse(cmdline, min_args, PARAMS, FLAGS, FILES):
                 for allowed_extension in extensions:
                     for cmd in cmdline:
                         if len(cmd) > 3: ## lowest cmd size is 4, e.g.: '.ext'
-                            if cmd[-4:] == allowed_extension:
+                            if cmd[-(len(allowed_extension)):] == allowed_extension:
                                 PARAMS[file] = cmd
                                 if DEBUG:
                                     print(" ... assigned '%s' =  %s" % (file, cmd))

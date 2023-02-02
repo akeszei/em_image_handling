@@ -28,6 +28,83 @@ def usage():
     print("===================================================================================================")
     sys.exit()
 
+def get_eer_data(file, HEADER_INFO):
+    ## load the tiff file as an accessible object without opening it (avoiding memory problems)
+    tif = tifffile.TiffFile(file)
+    ## grab information from the object 
+    y_dim, x_dim = tif.pages[0].shape[0], tif.pages[0].shape[1]
+    z_dim = len(tif.pages)
+
+    HEADER_INFO['image_dimensions'] = '(%s, %s, %s)' % (x_dim, y_dim, z_dim)
+    HEADER_INFO['filename'] = file
+
+    ## import element tree for XML parsing
+    import xml.etree.ElementTree as ET 
+    ## read the header XML data and parse important information from it (based off Falcon4i camera output )
+    for tag in tif.pages[0].tags:
+        if '<metadata>' in str(tag.value):
+            if 'sensorPixelSize' in str(tag.value):
+                tree = ET.fromstring(str(tag.value, 'utf-8'))
+                for items in tree.findall('item'):
+                    for item in items.iter():
+                        item_name = item.get('name')
+                        item_text = item.text
+                        if item_name == 'sensorPixelSize.height':
+                            angpix = item_text + ' ' + item.get('unit') + '/px'
+
+            if 'dose' in str(tag.value):
+                tree = ET.fromstring(str(tag.value, 'utf-8'))
+                for items in tree.findall('item'):
+                    for item in items.iter():
+                        item_name = item.get('name')
+                        item_text = item.text
+                        if item_name == 'dose':
+                            dose_per_frame = item_text + ' ' + item.get('unit')
+
+            if 'exposureTime' in str(tag.value):
+                tree = ET.fromstring(str(tag.value, 'utf-8'))
+                for items in tree.findall('item'):
+                    for item in items.iter():
+                        item_name = item.get('name')
+                        item_text = item.text
+                        if item_name == 'exposureTime':
+                            exposure_time = item_text + ' ' + item.get('unit')
+
+            # print("name, value = ", tag.name, tag.value)
+
+    HEADER_INFO['angpix'] = angpix
+    ## image is too large to parse the min/max/mean values 
+    HEADER_INFO['min'] = 'too large to read'
+    HEADER_INFO['max'] = 'too large to read'
+    HEADER_INFO['mean'] = 'too large to read'
+    HEADER_INFO['exposure time'] = exposure_time
+    HEADER_INFO['dose/frame'] = dose_per_frame
+
+    return 
+
+def get_mrcs_data(file, HEADER_INFO):
+    with mrcfile.open(file) as mrcs:
+        ## deal with single frame mrcs files as special case
+        if len(mrcs.data.shape) == 2:
+            y_dim, x_dim = mrcs.data.shape[0], mrcs.data.shape[1]
+            z_dim = 1
+        else:
+            ## X axis is always the last in shape (see: https://mrcfile.readthedocs.io/en/latest/usage_guide.html)
+            y_dim, x_dim, z_dim = mrcs.data.shape[1], mrcs.data.shape[2], mrcs.data.shape[0]
+
+        HEADER_INFO['image_dimensions'] = '(%s, %s, %s)' % (x_dim, y_dim, z_dim)
+        HEADER_INFO['filename'] = file
+        HEADER_INFO['angpix'] = mrcs.voxel_size.x
+        HEADER_INFO['min'] = mrcs.header.dmin
+        HEADER_INFO['max'] = mrcs.header.dmax
+        HEADER_INFO['mean'] = mrcs.header.dmean
+
+
+        print("MRC mode = ", mrcs.header.mode)
+        # mrc.print_header()
+
+
+
 def get_ser_data(file, HEADER_INFO):
     ## use serReader module to parse the .SER file data into memory
     ser = serReader.serReader(file)
@@ -39,6 +116,7 @@ def get_ser_data(file, HEADER_INFO):
     HEADER_INFO['min'] = ser['data'].min()
     HEADER_INFO['max'] = ser['data'].max()
     HEADER_INFO['mean'] = ser['data'].mean()
+    
 
 
 def get_mrc_data(file, HEADER_INFO):
@@ -101,6 +179,14 @@ if __name__ == "__main__":
         print(" Could not import serReader module. Make sure script is in same directory as main script: ")
         print("  > %s" % os.path.realpath(__file__))
         sys.exit()
+
+    try:
+        import tifffile
+    except:
+        print(" Could not import tifffile module. Install dependency via: ")
+        print("  > pip install tifffile")
+        sys.exit()
+
     ##################################
 
     ##################################
@@ -135,7 +221,7 @@ if __name__ == "__main__":
     }
 
     FILES = { ## cmd line index    allowed extensions   ## can launch batch mode
-        'input_file' : (  -1,         ['.ser','.mrc'],  False)
+        'input_file' : (  -1,         ['.ser','.mrc','.eer','.mrcs'],  False)
         }
     ##################################
 
@@ -164,6 +250,11 @@ if __name__ == "__main__":
     elif extension == '.ser':
         get_ser_data(PARAMS['input_file'], HEADER_INFO)
         print("SER submitted")
-
+    elif extension == '.eer':
+        get_eer_data(PARAMS['input_file'], HEADER_INFO)
+        print("EER submitted")
+    elif extension == '.mrcs':
+        get_mrcs_data(PARAMS['input_file'], HEADER_INFO)
+        print("MRCS submitted")
 
     print_header(HEADER_INFO, PARAMS)
