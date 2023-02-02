@@ -74,9 +74,9 @@ def get_eer_data(file, HEADER_INFO):
 
     HEADER_INFO['angpix'] = angpix
     ## image is too large to parse the min/max/mean values 
-    HEADER_INFO['min'] = 'too large to read'
-    HEADER_INFO['max'] = 'too large to read'
-    HEADER_INFO['mean'] = 'too large to read'
+    # HEADER_INFO['min'] = 'too large to read'
+    # HEADER_INFO['max'] = 'too large to read'
+    # HEADER_INFO['mean'] = 'too large to read'
     HEADER_INFO['exposure time'] = exposure_time
     HEADER_INFO['dose/frame'] = dose_per_frame
 
@@ -102,6 +102,7 @@ def get_mrcs_data(file, HEADER_INFO):
 
         print("MRC mode = ", mrcs.header.mode)
         # mrc.print_header()
+    return 
 
 
 
@@ -116,7 +117,7 @@ def get_ser_data(file, HEADER_INFO):
     HEADER_INFO['min'] = ser['data'].min()
     HEADER_INFO['max'] = ser['data'].max()
     HEADER_INFO['mean'] = ser['data'].mean()
-    
+    return 
 
 
 def get_mrc_data(file, HEADER_INFO):
@@ -131,16 +132,18 @@ def get_mrc_data(file, HEADER_INFO):
 
         print("MRC mode = ", mrc.header.mode)
         # mrc.print_header()
-
+    return 
 
 def print_header(HEADER_INFO, PARAMS):
     for key in HEADER_INFO:
         if PARAMS['ANGPIX_ONLY']:
             if key == 'angpix':
                 print("  %s = %s" % (key, HEADER_INFO[key]))
+                return 
         if PARAMS['DIMENSIONS_ONLY']:
             if key == 'image_dimensions':
                 print("  %s = %s" % (key, HEADER_INFO[key]))
+                return 
         else:
             print("  %s = %s" % (key, HEADER_INFO[key]))
 
@@ -237,9 +240,9 @@ if __name__ == "__main__":
         'filename' : '',
         'angpix' : '',
         'image_dimensions' : '',
-        'min' : '',
-        'max' : '',
-        'mean': ''
+        # 'min' : '',
+        # 'max' : '',
+        # 'mean': ''
     }
 
     ## determine which filetype was submitted and pass it to the appropriate function for parsing
