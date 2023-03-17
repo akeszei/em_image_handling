@@ -188,6 +188,11 @@ def get_mrc_raw_data(file):
         print(" Opening %s" % file)
         print("   >> image dimensions (x, y) = (%s, %s)" % (image_data.shape[1], image_data.shape[0]))
         print("   >> pixel size = %s Ang/px" % pixel_size)
+
+    ## set defaults 
+    if pixel_size == 0:
+        pixel_size = 1.0
+
     return image_data, pixel_size
 
 def mrc2grayscale(mrc_raw_data, pixel_size, lowpass_threshold):
@@ -802,7 +807,7 @@ class MainUI:
             ## fast but less accurate method
             img_scaled = resize_image(mrc_im_array, self.scale_factor)
             img_array, ctf_img_array = mrc2grayscale(img_scaled, self.pixel_size / self.scale_factor, self.lowpass_threshold)
-            img_contrasted = sigma_contrast(img_array, self.sigma_contrast)
+            img_contrasted = sigma_contrast(img_array, self.sigma_contrast)  
             im_obj = get_PhotoImage_obj(img_contrasted, self.SHOW_SCALEBAR.get(), scalebar_px = int(self.scalebar_length / (self.pixel_size / self.scale_factor)))
             ctf_contrasted = sigma_contrast(ctf_img_array, self.sigma_contrast)
             ctf_contrasted = gamma_contrast(ctf_contrasted, 0.4)
@@ -1059,7 +1064,10 @@ if __name__ == '__main__':
     import mrcfile
     import cv2 ## for resizing images with a scaling factor
     # from PIL import ImageGrab ## ImageGrab from PIL does not work for Linux, use pyscreenshot (pip install pyscreenshot)
-    import pyscreenshot as ImageGrab
+    try:
+        import pyscreenshot as ImageGrab
+    except:
+        print("Could not load pyscreenshot module")
 
     usage()
     root = tk.Tk()
