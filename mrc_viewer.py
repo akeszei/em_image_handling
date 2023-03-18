@@ -43,12 +43,14 @@ def add_scalebar(image_obj, scalebar_px, scalebar_stroke):
 def find_file_index(fname, directory_list, IGNORE_CAPS = True):
     """ For a given file name and list of files in directory, return the index that corresponds to the input file name or None if not present
     """
+    fname = os.path.basename(fname)
     i = 0
     for file_w_path in directory_list:
         basename = os.path.basename(file_w_path)
         if fname.lower() == basename.lower():
             return i
         i += 1
+
     ## if we have not returned an index, then return an error
     if DEBUG: print(" No match found for file (%s)" % fname)
     return None
@@ -240,7 +242,7 @@ def coord2freq(x, y, fft_width, fft_height, angpix):
 
 
 class MainUI:
-    def __init__(self, instance):
+    def __init__(self, instance, start_index):
         self.instance = instance
         instance.title("Tk-based MRC viewer")
         # instance.geometry("520x500")
@@ -265,7 +267,7 @@ class MainUI:
         self.scalebar_stroke = 5 ## pixels
         self.scalebar_color = 'white'
         self.SHOW_CTF = tk.BooleanVar(instance, False)
-        self.index = 0 ## index of the list of known mrc files int he directory to view
+        self.index = start_index ## 0 ## index of the list of known mrc files int he directory to view
         self.working_dir = "."
         self.SPEED_OVER_ACCURACY = tk.BooleanVar(instance, True)
 
@@ -1070,6 +1072,18 @@ if __name__ == '__main__':
         print("Could not load pyscreenshot module")
 
     usage()
+
+    ## parse the commandline in case the user added specific file to open, it will open the last one if more than one is given 
+    start_index =  0
+    for arg in sys.argv:
+        ## find the files in the working directory
+        image_list = get_mrc_files_in_dir(".")
+        # print("ARG = ", arg, arg[-4:])
+        if arg[-4:] == ".mrc":
+            start_index = find_file_index(arg, image_list)
+            # print(" ... match file (name, index) ->  (%s, %s)" % (arg, start_index) )
+
+
     root = tk.Tk()
-    app = MainUI(root)
+    app = MainUI(root, start_index)
     root.mainloop()
