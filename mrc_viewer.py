@@ -6,16 +6,33 @@
 """
 To Do:
     - Somehow lock the left/right keys from firing while loading an image. Basic attempts to do this by adding a flag on the start/end of the load_img function fails since the keystrokes are queued and fire after the function completes 
+    - Add ctf toggle with 'c' keyboard press 
+    - Add user key notes to usage text 
+    - Swap text 'Speed over accuracy' to 'Use binned'
 """ 
 
 
 DEBUG = False
+start_time = None
+
 
 def usage():
     print("====================================================================================")
     print(" A simple Tk-based .MRC viewer with useful single-particle image analysis tools. ")
     print("====================================================================================")
     return
+
+def speedtest(method):
+    global start_time
+    if method == 'start': 
+        start_time = time.time()
+    
+    if method == 'stop':
+        end_time = time.time()
+        total_time_taken = end_time - start_time
+        print("... runtime = %.2f sec" % total_time_taken)
+    return
+
 
 def add_scalebar(image_obj, scalebar_px, scalebar_stroke):
     """ Adds a scalebar to the input image and returns a new edited image
@@ -237,7 +254,8 @@ def mrc2grayscale(mrc_raw_data, pixel_size, lowpass_threshold):
     ## remap the mrc data to grayscale range
     remapped = (255*(mrc_raw_data - np.min(mrc_raw_data))/np.ptp(mrc_raw_data)).astype(np.uint8) ## remap data from 0 -- 255 as integers
 
-    lowpassed, ctf = lowpass(remapped, lowpass_threshold, pixel_size)
+    # lowpassed, ctf = lowpass(remapped, lowpass_threshold, pixel_size)
+    lowpassed, ctf = lowpass2(remapped, lowpass_threshold, pixel_size)
 
     return lowpassed, ctf
 
@@ -897,6 +915,8 @@ class MainUI:
     def load_img(self, fname):
         """ Load the mrc image with the given file name
         """
+        if DEBUG: speedtest('start')
+
         mrc_im_array, self.pixel_size = get_mrc_raw_data(fname)
         self.mrc_dimensions = (mrc_im_array.shape[1], mrc_im_array.shape[0])
 
@@ -946,6 +966,7 @@ class MainUI:
         ## draw image coordinates if necessary
         self.draw_image_coordinates()
 
+        if DEBUG: speedtest('stop')
         return
 
     def debugging(self):
@@ -1154,18 +1175,21 @@ if __name__ == '__main__':
     from tkinter.messagebox import showerror
     from tkinter import ttk
     import numpy as np
-    import os, string, sys
-    from PIL import Image as PIL_Image
-    from PIL import ImageTk
-    import re ## for use of re.findall() function to extract numbers from strings
-    # import copy
+    import os, sys
+    import time
+    try:
+        from PIL import Image as PIL_Image
+        from PIL import ImageTk
+    except:
+        print("Problem importing PIL, try installing Pillow via:")
+        print("   $ pip install --upgrade Pillow")
+
     import mrcfile
-    import cv2 ## for resizing images with a scaling factor
-    # from PIL import ImageGrab ## ImageGrab from PIL does not work for Linux, use pyscreenshot (pip install pyscreenshot)
-    # try:
-    #     import pyscreenshot as ImageGrab
-    # except:
-    #     print("Could not load pyscreenshot module")
+    try:
+        import cv2 ## for resizing images with a scaling factor
+    except:
+        print("Could not import cv2, try installing OpenCV via:")
+        print("   $ pip install opencv-python")
     import scipy.ndimage as ndimage
 
     usage()
