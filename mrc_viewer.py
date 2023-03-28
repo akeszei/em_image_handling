@@ -2,14 +2,18 @@
 
 ## Author: Alexander Keszei
 ## 2022-05-11: Version 1 finished
+## 2023-03-27: Updated to improve filtering on fast implementation (switching interpolation mode on resize function was crucial)
+"""
+To Do:
+    - Somehow lock the left/right keys from firing while loading an image. Basic attempts to do this by adding a flag on the start/end of the load_img function fails since the keystrokes are queued and fire after the function completes 
+""" 
+
 
 DEBUG = False
 
 def usage():
     print("====================================================================================")
     print(" A simple Tk-based .MRC viewer with useful single-particle image analysis tools. ")
-    print(" By default, images are loaded pre-binned for speed. Unset 'Speed over accuracy'")
-    print(" for better results.")
     print("====================================================================================")
     return
 
@@ -86,55 +90,84 @@ def gamma_contrast(im_array, gamma=1.0):
     if DEBUG: print(" gamma_contrast (g = %s)" % gamma)
     return im
 
-def lowpass(img, threshold, pixel_size):
-    if DEBUG:
-        print(" Low pass filter image by %s Ang (%s angpx)" % (threshold, pixel_size))
+def lowpass2(img, threshold, pixel_size):
+    """ Another example of a fast implementation of a lowpass filter (not used here)
+        ref: https://wsthub.medium.com/python-computer-vision-tutorials-image-fourier-transform-part-3-e65d10be4492
+    """
 
-    # img = cv2.imread('lena.png')
-    # do dft saving as complex output
-    dft = np.fft.fft2(img)
-    # apply shift of origin to center of image
-    dft_shift = np.fft.fftshift(dft)
-
-    # ## to view the fft we need to play with the results
-    f_abs = np.abs(dft_shift)
-    f_bounded = 20 * np.log(f_abs) # we take the logarithm of the absolute value of f_complex, because f_abs has tremendously wide range.
-    f_img = 255 * f_bounded / np.max(f_bounded) ## convert data to grayscale based on the new range
-    f_img = f_img.astype(np.uint8)
-
-    ## if we have a zero or negative value, just return the input image and calculated CTF
-    if threshold <= 0:
-        return img, f_img
-
-
-    # create circle mask at a resolution given by the threshold and pixel size
+    ## create circle mask at a resolution given by the threshold and pixel size
     radius = int(img.shape[0] * pixel_size / threshold)
-    if DEBUG: print(" FFT mask radius calculated for %s ang is %s" % (threshold, radius))
-    # radius = 1000
+    if DEBUG: print(" FFT mask radius calculated for %s ang (%s apix) is %s" % (threshold, pixel_size, radius))
     mask = np.zeros_like(img)
     cy = mask.shape[0] // 2
     cx = mask.shape[1] // 2
     cv2.circle(mask, (cx,cy), radius, (255,255), -1)[0]
+    ## blur the mask
+    lowpass_mask = cv2.GaussianBlur(mask, (19,19), 0)
 
-    # blur the mask
-    mask2 = cv2.GaussianBlur(mask, (19,19), 0)
+    f = cv2.dft(img.astype(np.float32), flags=cv2.DFT_COMPLEX_OUTPUT)
+    f_shifted = np.fft.fftshift(f)
+    f_complex = f_shifted[:,:,0]*1j + f_shifted[:,:,1]
+    f_filtered = lowpass_mask * f_complex
+    f_filtered_shifted = np.fft.fftshift(f_filtered)
+    inv_img = np.fft.ifft2(f_filtered_shifted) # inverse F.T.
+    filtered_img = np.abs(inv_img)
+    filtered_img -= filtered_img.min()
+    filtered_img = filtered_img*255 / filtered_img.max()
+    filtered_img = filtered_img.astype(np.uint8)
 
-    # apply mask to dft_shift
-    dft_shift_masked2 = np.multiply(dft_shift,mask2) / 255
+    ## to view the fft we need to play with the results
+    f_abs = np.abs(f_complex)
+    f_bounded = 20 * np.log(f_abs) # we take the logarithm of the absolute value of f_complex, because f_abs has tremendously wide range.
+    f_img = 255 * f_bounded / np.max(f_bounded) ## convert data to grayscale based on the new range
+    f_img = f_img.astype(np.uint8)
+    return filtered_img, f_img
 
-    # shift origin from center to upper left corner
-    # back_ishift = np.fft.ifftshift(dft_shift)
-    back_ishift_masked2 = np.fft.ifftshift(dft_shift_masked2)
+def lowpass(img, threshold, pixel_size):
+    if DEBUG:
+        print(" Low pass filter image by %s Ang (%s angpx)" % (threshold, pixel_size))
 
-    # do idft saving as complex output
-    # img_back = np.fft.ifft2(back_ishift)
-    img_filtered2 = np.fft.ifft2(back_ishift_masked2)
+    ## generate 2D FFT as complex output
+    im_fft_raw = np.fft.fft2(img)
+    ## apply shift of origin to center of image
+    im_fft = np.fft.fftshift(im_fft_raw)
 
-    # combine complex real and imaginary components to form (the magnitude for) the original image again
-    # img_back = np.abs(img_back).clip(0,255).astype(np.uint8)
-    img_filtered2 = np.abs(img_filtered2).clip(0,255).astype(np.uint8)
+    ## for display purposes, adjust the fft image to a suitable range 
+    im_fft_abs = np.abs(im_fft) # combine real & imaginary components   
+    im_fft_bounded = 20 * np.log(im_fft_abs) # the natural FT has a large dynamic range, compress it and rescale it for better contrast
+    im_fft_display = 255 * im_fft_bounded / np.max(im_fft_bounded) # fit the signal into the grayscale image range (0 - 255)
+    im_fft_display = im_fft_display.astype(np.uint8) # recast as a uint8 array which is the expected format for a grayscale image by more programs
 
-    return img_filtered2, f_img
+    ## if we have a zero or negative value for the lowpass threshold, it means we are not applying a filter
+    ## just return the input image and calculated CTF
+    if threshold <= 0:
+        return img, im_fft_display
+
+    ## prepare the lowpass filter by creating a circular mask at a resolution given by the threshold and pixel size
+    radius = int(img.shape[0] * pixel_size / threshold) # in Fourier space, this is the distance from the central origin that corresponds to the given resolution threshold (assuming the image is square)
+    if DEBUG: print(" FFT mask radius calculated for %s ang is %s" % (threshold, radius))
+    mask = np.zeros_like(img) # prepare a black canvas 
+    cy = mask.shape[0] // 2 # find the central y-axis coordinate of the image
+    cx = mask.shape[1] // 2 # find the central x-axis coordinate of the image
+    cv2.circle(mask, (cx,cy), radius, (255,255), -1) # set all pixels of a centered circle of given radius to white 
+    # cv2.circle(mask, (cx,cy), radius, (255,255), -1)[0] #
+    gauss_kernel = (9, 9) # must be odd ## NOTE: An arbitrary kernel size is used here, maybe adjust dynamically based on image size?
+    soft_mask = cv2.GaussianBlur(mask, gauss_kernel, 0) # blur the mask to avoid hard edges in Fourier space
+
+    # ## Uncomment to display the mask
+    # cv2.imshow('', soft_mask)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    ## convolve the lowpass mask with the centered image FFT to apply filter
+    filtered_fft = np.multiply(im_fft,soft_mask) / 255
+
+    ## reverse the steps to regenerate the filtered image 
+    filtered_fft_backshift = np.fft.ifftshift(filtered_fft) # shift origin back from center to upper left corner
+    filtered_im_complex = np.fft.ifft2(filtered_fft_backshift) # calculate inverse FFT
+    filtered_im = np.abs(filtered_im_complex).clip(0,255).astype(np.uint8) # combine complex real and imaginary components and clip it back into a working range for a grayscale image
+
+    return filtered_im, im_fft_display
 
 def resize_image(img_nparray, scaling_factor):
     """ Uses OpenCV to resize an input grayscale image (0-255, 2d array) based on a given scaling factor
@@ -144,9 +177,9 @@ def resize_image(img_nparray, scaling_factor):
     original_height = img_nparray.shape[0]
     scaled_width = int(img_nparray.shape[1] * scaling_factor)
     scaled_height = int(img_nparray.shape[0] * scaling_factor)
-    # print("resize_img function, original img_dimensions = ", im_array.shape, ", new dims = ", scaled_width, scaled_height)
-    # resized_im = cv2.resize(img_nparray, (scaled_width, scaled_height), interpolation=cv2.INTER_NEAREST) ## need to change the default interpolation since we are using a int array
-    resized_im = cv2.resize(img_nparray, (scaled_width, scaled_height))
+    if DEBUG: print("resize_img function, original img_dimensions = ", img_nparray.shape, ", new dims = ", scaled_width, scaled_height)
+    resized_im = cv2.resize(img_nparray, (scaled_width, scaled_height), interpolation=cv2.INTER_AREA) 
+    # resized_im = cv2.resize(img_nparray, (scaled_width, scaled_height)) ## note: default interpolation is INTER_LINEAR, and does not work well for noisy EM micrographs 
     return resized_im
 
 def get_mrc_files_in_dir(path):
@@ -204,7 +237,6 @@ def mrc2grayscale(mrc_raw_data, pixel_size, lowpass_threshold):
     ## remap the mrc data to grayscale range
     remapped = (255*(mrc_raw_data - np.min(mrc_raw_data))/np.ptp(mrc_raw_data)).astype(np.uint8) ## remap data from 0 -- 255 as integers
 
-    ## lowpass filter the image by the given threshold
     lowpassed, ctf = lowpass(remapped, lowpass_threshold, pixel_size)
 
     return lowpassed, ctf
@@ -240,6 +272,42 @@ def coord2freq(x, y, fft_width, fft_height, angpix):
         print(" ==============================================================================")
     return frequency, difference_vector_magnitude
 
+def gaussian_blur(self, im_array, sigma, DEBUG = True):
+    if DEBUG:
+        print("=======================================")
+        print(" image_handler :: gaussian_blur")
+        print("---------------------------------------")
+        print("  input img dim = ", im_array.shape)
+        print("  sigma = ", sigma)
+        print("=======================================")
+
+    blurred_img = ndimage.gaussian_filter(im_array, sigma)
+    return blurred_img
+
+def auto_contrast(self, im_array, DEBUG = True):
+    """ Rescale the image intensity levels to a reasonable range using the top/bottom 2 percent
+        of the data to define the intensity levels
+    """
+    ## avoid hotspot pixels by looking at a group of pixels at the extreme ends of the image
+    minval = np.percentile(im_array, 2)
+    maxval = np.percentile(im_array, 98)
+
+    if DEBUG:
+        print("=======================================")
+        print(" image_handler :: auto_contrast")
+        print("---------------------------------------")
+        print("  input img dim = ", im_array.shape)
+        print("  original img min, max = (%s, %s)" % (np.min(im_array), np.max(im_array)))
+        print("  stretch to new min, max = (%s %s)" % (minval, maxval))
+        print("=======================================")
+
+    ## remove pixles above/below the defined limits
+    im_array = np.clip(im_array, minval, maxval)
+    ## rescale the image into the range 0 - 255
+    im_array = ((im_array - minval) / (maxval - minval)) * 255
+
+    return im_array
+
 
 class MainUI:
     def __init__(self, instance, start_index):
@@ -252,6 +320,7 @@ class MainUI:
         self.displayed_widgets = list() ## container for all widgets packed into the main display UI, use this list to update each
         self.display_data = list() ## container for the image objects for each displayed widgets (they must be in the scope to be drawn)
                                    ## in this program, display_data[0] will contain the scaled .jpg-style image; while display_data[1] will contain the display-ready CTF for that image
+        self.display_im_arrays = list() ## contains the nparray versions of the image/ctf currently in the display window (for saving jpgs) 
         self.mrc_dimensions = ('x', 'y')
         self.pixel_size = float()
         self.image_name = str()
@@ -320,7 +389,7 @@ class MainUI:
         self.show_CTF_TOGGLE = tk.Checkbutton(instance, text='Display CTF', variable=self.SHOW_CTF, onvalue=True, offvalue=False, command=self.toggle_SHOW_CTF)
         self.show_CTF_TOGGLE.grid(row = 10, column = 1, columnspan = 2, sticky = (tk.N, tk.W))
 
-        self.speed_over_accuracy_TOGGLE = tk.Checkbutton(instance, text='Speed over accuracy', variable=self.SPEED_OVER_ACCURACY, onvalue=True, offvalue=False)
+        self.speed_over_accuracy_TOGGLE = tk.Checkbutton(instance, text='Speed over accuracy', variable=self.SPEED_OVER_ACCURACY, onvalue=True, offvalue=False, command = self.toggle_SPEED_OVER_ACCURACY)
         self.speed_over_accuracy_TOGGLE.grid(row = 11, column = 1, columnspan = 2, sticky = (tk.N, tk.W))
 
 
@@ -361,8 +430,8 @@ class MainUI:
 
         ## KEYBINDINGS
         self.instance.bind("<F1>", lambda event: self.debugging())
-        self.instance.bind("<F2>", lambda event: self.redraw_canvases())
-        self.instance.bind('<Control-KeyRelease-s>', lambda event: self.save_selected_mrcs())
+        # self.instance.bind("<F2>", lambda event: self.redraw_canvases())
+        # self.instance.bind('<Control-KeyRelease-s>', lambda event: self.save_selected_mrcs())
 
         self.instance.bind('<Left>', lambda event: self.next_img('left'))
         self.instance.bind('<Right>', lambda event: self.next_img('right'))
@@ -403,15 +472,41 @@ class MainUI:
         save_dir, save_name = os.path.split(str(file_w_path))
         # print("File selected: ", file_name)
         # print("Working directory: ", file_dir)
-        print(" Save display >> %s" % file_w_path)
 
-        active_canvas = self.displayed_widgets[0]
-        ImageGrab.grab(bbox=(
-                active_canvas.winfo_rootx(),
-                active_canvas.winfo_rooty(),
-                active_canvas.winfo_rootx() + active_canvas.winfo_width(),
-                active_canvas.winfo_rooty() + active_canvas.winfo_height()
-            )).save(os.path.join(save_dir, save_name), quality=95, subsampling=0)
+        if self.SHOW_CTF.get() == True:
+            img_to_save = self.display_im_arrays[1]
+        else:
+            img_to_save = self.display_im_arrays[0]
+    
+        cv2.imwrite(file_w_path, img_to_save, [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+        ## open the image to draw coordinate picks if activated 
+        if self.SHOW_PICKS.get() == True:
+            img_to_write = cv2.imread(file_w_path)
+            ## box_size is a value given in Angstroms, we need to convert it to pixels
+            display_angpix = self.pixel_size / self.scale_factor
+            box_width = self.picks_diameter / display_angpix
+            box_halfwidth = int(box_width / 2)
+
+            for coordinate in self.coordinates:
+                # print("writing coordinate @ =", coordinate)
+                cv2.circle(img_to_write, coordinate, box_halfwidth, (0,0,255), 2)
+            
+            cv2.imwrite(file_w_path, img_to_write, [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+        ## open the image to draw a scalebar if activated 
+        if self.SHOW_SCALEBAR.get() == True:
+            img_to_write = cv2.imread(file_w_path)
+            scalebar_px = int(self.scalebar_length / (self.pixel_size / self.scale_factor))
+            scalebar_stroke = self.scalebar_stroke
+            indent_x = int(self.display_im_arrays[0].shape[0] * 0.025)
+            indent_y = self.display_im_arrays[0].shape[1] - int(self.display_im_arrays[0].shape[1] * 0.025)
+            
+            cv2.line(img_to_write, (indent_x, indent_y), (indent_x + scalebar_px, indent_y), (255, 255, 255), scalebar_stroke)
+
+            cv2.imwrite(file_w_path, img_to_write, [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+        print(" Saved display to >> %s" % file_w_path)
 
         return
 
@@ -623,6 +718,18 @@ class MainUI:
 
         return
 
+    def toggle_SPEED_OVER_ACCURACY(self):
+        """
+        """
+        if DEBUG: print(" Speed over accuracy toggle actuated, reload image.")
+        ## remove the active canvas from the display 
+        self.destroy_active_canvases()
+        ## to temporarily display an empty canvas, we need to make a call to the gui to force a redraw
+        self.scrollable_frame.update() ## update the frame holding the data
+        ## start loading the next image with the new toggle setting 
+        self.load_img(image_list[self.index])
+        return
+
     def toggle_SHOW_PICKS(self):
         """
         """
@@ -806,11 +913,11 @@ class MainUI:
             ctf_contrasted = gamma_contrast(ctf_contrasted, 0.4)
             ctf_obj = get_PhotoImage_obj(ctf_contrasted)
         else:
-            ## fast but less accurate method
+            ## it is much faster if we scale down the image prior to doing filtering
             img_scaled = resize_image(mrc_im_array, self.scale_factor)
             img_array, ctf_img_array = mrc2grayscale(img_scaled, self.pixel_size / self.scale_factor, self.lowpass_threshold)
             img_contrasted = sigma_contrast(img_array, self.sigma_contrast)  
-            im_obj = get_PhotoImage_obj(img_contrasted, self.SHOW_SCALEBAR.get(), scalebar_px = int(self.scalebar_length / (self.pixel_size / self.scale_factor)))
+            im_obj = get_PhotoImage_obj(img_contrasted, self.SHOW_SCALEBAR.get(), scalebar_px = int(self.scalebar_length / (self.pixel_size / self.scale_factor)), scalebar_stroke = self.scalebar_stroke)
             ctf_contrasted = sigma_contrast(ctf_img_array, self.sigma_contrast)
             ctf_contrasted = gamma_contrast(ctf_contrasted, 0.4)
             ctf_obj = get_PhotoImage_obj(ctf_contrasted)
@@ -818,6 +925,7 @@ class MainUI:
 
         ## update the display data on the class
         self.display_data = [ im_obj, ctf_obj ]
+        self.display_im_arrays = [ img_contrasted, ctf_contrasted ]
         self.image_name = os.path.basename(fname)
 
         # a, b = get_fixed_array_index(1, 1)
@@ -837,6 +945,7 @@ class MainUI:
 
         ## draw image coordinates if necessary
         self.draw_image_coordinates()
+
         return
 
     def debugging(self):
@@ -1005,19 +1114,6 @@ class MainUI:
         self.displayed_widgets = []
         return
 
-    def redraw_canvases(self):
-        ## delete existing canvases
-        self.destroy_active_canvases()
-
-        ## atm just populate a random number of new canvases
-        for i in range(100):
-            a, b = get_fixed_array_index(i, 10)
-            self.add_canvas(self.scrollable_frame, row = a, col = b, reference = self.displayed_widgets)
-
-        self.resize_program_to_fit_screen_or_data()
-
-        return
-
     def resize_program_to_fit_screen_or_data(self):
         """ Update the widget displaying the data and check the best default screen size for the main UI, then adjust to that size
         """
@@ -1066,10 +1162,11 @@ if __name__ == '__main__':
     import mrcfile
     import cv2 ## for resizing images with a scaling factor
     # from PIL import ImageGrab ## ImageGrab from PIL does not work for Linux, use pyscreenshot (pip install pyscreenshot)
-    try:
-        import pyscreenshot as ImageGrab
-    except:
-        print("Could not load pyscreenshot module")
+    # try:
+    #     import pyscreenshot as ImageGrab
+    # except:
+    #     print("Could not load pyscreenshot module")
+    import scipy.ndimage as ndimage
 
     usage()
 
