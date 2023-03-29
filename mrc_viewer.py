@@ -7,18 +7,22 @@
 To Do:
     - Somehow lock the left/right keys from firing while loading an image. Basic attempts to do this by adding a flag on the start/end of the load_img function fails since the keystrokes are queued and fire after the function completes 
     - Add ctf toggle with 'c' keyboard press 
-    - Add user key notes to usage text 
-    - Swap text 'Speed over accuracy' to 'Use binned'
 """ 
-
 
 DEBUG = False
 start_time = None
 
-
 def usage():
     print("====================================================================================")
-    print(" A simple Tk-based .MRC viewer with useful single-particle image analysis tools. ")
+    print("   A simple Tk-based .MRC viewer with useful single-particle image analysis tools. ")
+    print("------------------------------------------------------------------------------------")
+    print("   - Left/Right arrow keys iterate over .MRC files in directory/")
+    print("   - Left click with 'Show particle picks' on to draw circles of a given size.")
+    print("   - Adjust scale, filter (0 = no filter), and sigma contrast using right-hand menus")
+    print("   - Use 'Apply Scaled first' for speed, turn off for full resolution filtering (slow).")
+    print("   - Use the File > Open menu to choose a specific file, or write its full name")
+    print("        in the input text widget at the top.")
+    print("   - Save out displayed image with File > Save menu.")
     print("====================================================================================")
     return
 
@@ -254,8 +258,8 @@ def mrc2grayscale(mrc_raw_data, pixel_size, lowpass_threshold):
     ## remap the mrc data to grayscale range
     remapped = (255*(mrc_raw_data - np.min(mrc_raw_data))/np.ptp(mrc_raw_data)).astype(np.uint8) ## remap data from 0 -- 255 as integers
 
-    # lowpassed, ctf = lowpass(remapped, lowpass_threshold, pixel_size)
-    lowpassed, ctf = lowpass2(remapped, lowpass_threshold, pixel_size)
+    # lowpassed, ctf = lowpass(remapped, lowpass_threshold, pixel_size) # ~0.8 sec
+    lowpassed, ctf = lowpass2(remapped, lowpass_threshold, pixel_size) # ~0.7 sec
 
     return lowpassed, ctf
 
@@ -407,7 +411,7 @@ class MainUI:
         self.show_CTF_TOGGLE = tk.Checkbutton(instance, text='Display CTF', variable=self.SHOW_CTF, onvalue=True, offvalue=False, command=self.toggle_SHOW_CTF)
         self.show_CTF_TOGGLE.grid(row = 10, column = 1, columnspan = 2, sticky = (tk.N, tk.W))
 
-        self.speed_over_accuracy_TOGGLE = tk.Checkbutton(instance, text='Speed over accuracy', variable=self.SPEED_OVER_ACCURACY, onvalue=True, offvalue=False, command = self.toggle_SPEED_OVER_ACCURACY)
+        self.speed_over_accuracy_TOGGLE = tk.Checkbutton(instance, text='Apply scale first', variable=self.SPEED_OVER_ACCURACY, onvalue=True, offvalue=False, command = self.toggle_SPEED_OVER_ACCURACY)
         self.speed_over_accuracy_TOGGLE.grid(row = 11, column = 1, columnspan = 2, sticky = (tk.N, tk.W))
 
 
@@ -455,7 +459,7 @@ class MainUI:
         self.instance.bind('<Right>', lambda event: self.next_img('right'))
         self.instance.bind('<z>', lambda event: self.next_img('left'))
         self.instance.bind('<x>', lambda event: self.next_img('right'))
-
+        # self.instance.bind('<c>', lambda event: self.toggle_SHOW_CTF()) ## will need to set the toggle
 
         self.image_name_label.bind('<Control-KeyRelease-a>', lambda event: self.select_all(self.image_name_label))
         self.image_name_label.bind('<Return>', lambda event: self.image_name_updated())
