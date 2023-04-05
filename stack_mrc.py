@@ -6,6 +6,7 @@
 
 ## 2021-10-26: Script started
 ## 2023-03-21: Polished script to automatically handle header data & mrc modes. Allow user input to specify output file name, choose a different directory than the current one, and use a reference file to chose which .MRC files to sort and in what order 
+## 2023-04-05: Fixed bug to remove path from files when retrieved by glob 
 
 #############################
 ###     FLAGS/GLOBALS
@@ -130,7 +131,7 @@ def get_mrc_filenames(dir, sort_files_list = ''):
     if sort_files_list == '':
         ## if no input file was provided, use glob matching and sort function to prepare the list 
         for file in glob.glob(dir + "*.mrc"):
-            files.append(file) ## inputs to the target function
+            files.append(os.path.basename(file)) ## inputs to the target function
         ## make sure list is sorted by alpha numeric
         files = sorted(files)
     else:
@@ -207,6 +208,10 @@ def get_mrc_header(dir, fname):
         mrc_mode = int(), mode of the .MRC file (see mrcfile documentation) 
         apix = float(), A/pix in the header 
     """
+    if DEBUG: 
+        print(" get_mrc_header :: ")
+        print("   >> dir = %s" % dir)
+        print("   >> fname = %s" % fname)
 
     ## check the input dir has a leading slash
     if dir[-1] != '/':
