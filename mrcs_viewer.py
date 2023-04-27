@@ -49,6 +49,33 @@ def get_mrcs_dtype(fname):
     return input_dtype
 
 
+def mrc2grayscale(mrc_raw_data):
+    """ Convert raw mrc data into a grayscale numpy array suitable for display
+    """
+    ## remap the mrc data to grayscale range
+    remapped = (255*(mrc_raw_data - np.min(mrc_raw_data))/np.ptp(mrc_raw_data)).astype(np.uint8) ## remap data from 0 -- 255 as integers
+    return remapped
+
+def sigma_contrast(im_array, sigma):
+    """ Rescale the image intensity levels to a range defined by a sigma value (the # of
+        standard deviations to keep). 
+    """
+    stdev = np.std(im_array)
+    mean = np.mean(im_array)
+    minval = mean - (stdev * sigma)
+    maxval = mean + (stdev * sigma)
+
+    if DEBUG:
+        print(" sigma_contrast (s = %s)" % sigma)
+
+    ## remove pixles above/below the defined limits
+    im_array = np.clip(im_array, minval, maxval)
+    ## rescale the image into the range 0 - 255
+    im_array = ((im_array - minval) / (maxval - minval)) * 255
+
+    return im_array.astype('uint8')
+
+
 def get_mrcs_dimensions(fname):
     """
     """
@@ -108,9 +135,20 @@ def resize_image(im_array, scaling_factor):
     original_height = im_array.shape[0]
     scaled_width = int(im_array.shape[1] * scaling_factor)
     scaled_height = int(im_array.shape[0] * scaling_factor)
-    # print("resize_img function, original img_dimensions = ", im_array.shape, ", new dims = ", scaled_width, scaled_height)
-    resized_im = cv2.resize(im_array, (scaled_width, scaled_height), interpolation=cv2.INTER_NEAREST) ## need to change the default interpolation since we are using a int array
+    print("resize_img function, original img_dimensions = ", im_array.shape, ", new dims = ", scaled_width, scaled_height)
+    # print(" single pixel value = ", im_array[0])
+    # resized_im = cv2.resize(im_array, (scaled_width, scaled_height), interpolation=cv2.INTER_NEAREST) ## for int arrays use INTER_NEAREST
+    resized_im = cv2.resize(im_array, (scaled_width, scaled_height), interpolation=cv2.INTER_AREA) ## for noisy micrographs, default INTER_LINEAR does not work well, switch to INTER_AREA
     return resized_im
+
+def get_img(raw_im, scaling_factor):
+    remapped = mrc2grayscale(raw_im)
+    print(" raw image range = ", np.min(raw_im), np.max(raw_im))
+    print(" remapped image range = ", np.min(remapped), np.max(remapped))
+    remapped = sigma_contrast(remapped, 3)
+    scaled = resize_image(remapped, scaling_factor)
+
+    return scaled 
 
 def get_mrcs_images(mrcs_file_path, scaling_factor, max_frames):
     if DEBUG:
@@ -121,21 +159,26 @@ def get_mrcs_images(mrcs_file_path, scaling_factor, max_frames):
     ## open the mrcs file as an nparray of dimension (n, box_size, box_size), where n is the number of images in the stack
     with mrcfile.open(mrcs_file_path) as mrcs:
         counter = 0
+        
         ## deal with single frame .mrcs files as a special case
         if len(mrcs.data.shape) == 2:
-            remapped = (255*(mrcs.data - np.min(mrcs.data))/np.ptp(mrcs.data)).astype(int) ## remap data from 0 -- 255
-            scaled = resize_image(remapped, scaling_factor)
-            img_stack.append(scaled)
+            # remapped = (255*(mrcs.data - np.min(mrcs.data))/np.ptp(mrcs.data)).astype(int) ## remap data from 0 -- 255
+            processed_img = get_img(mrcs.data.astype(np.float32), scaling_factor)
+            img_stack.append(processed_img)
         else:
             ## interate over the mrcs stack by index n
             for n in range(mrcs.data.shape[0]):
                 counter +=1
                 if counter > max_frames:
                     return img_stack
-                remapped = (255*(mrcs.data[n] - np.min(mrcs.data[n]))/np.ptp(mrcs.data[n])).astype(int) ## remap data from 0 -- 255
-                scaled = resize_image(remapped, scaling_factor)
+                # remapped = (255*(mrcs.data[n] - np.min(mrcs.data[n]))/np.ptp(mrcs.data[n])).astype(int) ## remap data from 0 -- 255
+                # remapped = mrc2grayscale(mrcs.data[n])
+                # scaled = resize_image(remapped, scaling_factor)
                 # remapped = add_text_to_img(remapped, text = str(counter))
-                img_stack.append(scaled)
+                # img_stack.append(scaled)
+                processed_img = get_img(mrcs.data[n].astype(np.float32), scaling_factor)
+                img_stack.append(processed_img)
+
 
     if DEBUG:
         print(" Extracted images from %s " % mrcs_file_path)
