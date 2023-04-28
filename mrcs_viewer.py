@@ -2,10 +2,12 @@
 
 ## Written by: Alexander Keszei
 ## 2022-05-01: mrcs_viewer.py version 1 complete
+## 2023-04-27: Updated to correctly display .mrcs files of raw exposures (i.e. tilt series). Also added other functionality.
 ## TO DO
 ## - Clean up code for scrollbar (pack it only in the initialize_canvases function, not also in __init__, no?)
+## - Update the header info correctly! 
 
-DEBUG = False
+DEBUG = True
 
 def usage():
     print("================================================================================================")
@@ -17,6 +19,11 @@ def usage():
     print("            --scale (1) : rescale displayed frame images by a value in range (0,inf)")
     print("      --max_frames (50) : display only the first n frames from the input file")
     print("             --cols (8) : arrange displayed images in an array defined by this column shape")
+    print("------------------------------------------------------------------------------------------------")
+    print(" Keyboard shortcuts: ")
+    print("    Ctrl + S : Save out a 'subsets.mrcs' file with the active selection")
+    print("           i : Invert the current selection")
+    print("    Ctrl + q : Quit program")
     print("================================================================================================")
     sys.exit()
     return
@@ -34,20 +41,13 @@ def make_empty_mrcs(stack_size, mrc_dimensions, dtype, fname):
         ## set the mrcfile with the correct header values to indicate it is an image stack
         mrcs.set_image_stack()
         if DEBUG:
-            print(" empty mrcs created = ", mrcs.data.shape, mrcs.data[0].dtype)
+            print("======================================")
+            print(" make_empty_mrcs ")
+            print("--------------------------------------")
+            print("  name = %s" % fname)
+            print("  dimensions = (%s, %s, %s)" % (mrc_dimensions[0], mrc_dimensions[1], stack_size))
+            print("  data type = %s" % dtype)
     return
-
-def get_mrcs_dtype(fname):
-    """
-    """
-    with mrcfile.open(fname, mode='r') as mrc:
-        ## open first frame and read dtype 
-        input_dtype = mrc.data.dtype
-
-    if DEBUG:
-        print(" ... input .MRCS dtype = %s" % input_dtype)
-    return input_dtype
-
 
 def mrc2grayscale(mrc_raw_data):
     """ Convert raw mrc data into a grayscale numpy array suitable for display
@@ -63,10 +63,20 @@ def sigma_contrast(im_array, sigma):
     stdev = np.std(im_array)
     mean = np.mean(im_array)
     minval = mean - (stdev * sigma)
+    if minval < 0:
+        minval = 0
     maxval = mean + (stdev * sigma)
+    if maxval > 255:
+        maxval = 255
 
     if DEBUG:
+        print("======================================")
         print(" sigma_contrast (s = %s)" % sigma)
+        print("--------------------------------------")
+        print("  stdev = %s" % stdev)
+        print("  mean = %s" % mean)
+        print("  input min, max = (%s, %s)" % (np.min(im_array), np.max(im_array)))
+        print("  cutoff min, max = (%s, %s)" % (minval, maxval))
 
     ## remove pixles above/below the defined limits
     im_array = np.clip(im_array, minval, maxval)
@@ -75,9 +85,8 @@ def sigma_contrast(im_array, sigma):
 
     return im_array.astype('uint8')
 
-
-def get_mrcs_dimensions(fname):
-    """
+def get_mrcs_info(fname):
+    """ Retrieve image dimensions, stack size and relevant header info from the file 
     """
     with mrcfile.open(fname, mode='r') as mrc:
         ## deal with single frame mrcs files as special case
@@ -88,11 +97,20 @@ def get_mrcs_dimensions(fname):
             ## X axis is always the last in shape (see: https://mrcfile.readthedocs.io/en/latest/usage_guide.html)
             y_dim, x_dim, z_dim = mrc.data.shape[1], mrc.data.shape[2], mrc.data.shape[0]
 
-        ## can read pixel size        
-        # print(mrc.voxel_size)
+        ## Read pixel size        
+        pixel_size = mrc.voxel_size['x']  
+        ## Read the dtype of the image array 
+        dtype = mrc.data.dtype
+
     if DEBUG:
-        print(" ... input .MRCS frame dimensions (x, y, z) = (%s, %s, %s)" % (x_dim, y_dim, z_dim))
-    return x_dim, y_dim, z_dim
+        print("======================================")
+        print(" get_mrcs_info (%s) " % fname)
+        print("--------------------------------------")
+        print("  (x, y, z) = (%s, %s, %s)" % (x_dim, y_dim, z_dim) )
+        print("  pixel_size = %s" % pixel_size)
+        print("  dtype = %s " % dtype)
+
+    return x_dim, y_dim, z_dim, pixel_size, dtype
 
 def write_chosen_frames_to_empty_mrcs(input_mrcs_fname, chosen_frames, output_mrcs_fname):
     """ input_mrcs_fname = str(); file name in working dir of the parent .MRCS to take a subset from
@@ -111,8 +129,8 @@ def write_chosen_frames_to_empty_mrcs(input_mrcs_fname, chosen_frames, output_mr
         ## sanity check there is a frame expected
         if frame_num in range(0, input_mrcs.data.shape[0]):
             frame_data = input_mrcs.data[frame_num]
-            if DEBUG:
-                print("Data read from file = (min, max) -> (%s, %s), dtype = %s" % (np.min(frame_data), np.max(frame_data), frame_data.dtype))
+            # if DEBUG:
+                # print("Data read from file = (min, max) -> (%s, %s), dtype = %s" % (np.min(frame_data), np.max(frame_data), frame_data.dtype))
 
             ## need to deal with single frame as a special case since array shape changes format
             if len(chosen_frames) == 1:
@@ -120,10 +138,14 @@ def write_chosen_frames_to_empty_mrcs(input_mrcs_fname, chosen_frames, output_mr
             else:
                 ## pass the frame data into the next available frame of the output mrcs
                 output_mrcs.data[i] = frame_data
-                if DEBUG:
-                    print("Data written to file = (min, max) -> (%s, %s), dtype = %s" % (np.min(output_mrcs.data[i]), np.max(output_mrcs.data[i]), output_mrcs.data[i].dtype))
+                # if DEBUG:
+                #     print("Data written to file = (min, max) -> (%s, %s), dtype = %s" % (np.min(output_mrcs.data[i]), np.max(output_mrcs.data[i]), output_mrcs.data[i].dtype))
         else:
             print(" Input frame value requested (%s) not in expected range of .MRCS input file: (%s; [%s, %s])" % (frame_num, input_mrcs_fname, 1, input_mrcs.data.shape[0]))
+
+    output_mrcs.voxel_size = input_mrcs.voxel_size
+    output_mrcs.update_header_from_data()
+    output_mrcs.update_header_stats()
 
     output_mrcs.close()
     input_mrcs.close()
@@ -131,28 +153,30 @@ def write_chosen_frames_to_empty_mrcs(input_mrcs_fname, chosen_frames, output_mr
 
 def resize_image(im_array, scaling_factor):
     ## calculate the new dimensions based on the scaling factor and input image
-    original_width = im_array.shape[1]
-    original_height = im_array.shape[0]
     scaled_width = int(im_array.shape[1] * scaling_factor)
     scaled_height = int(im_array.shape[0] * scaling_factor)
-    print("resize_img function, original img_dimensions = ", im_array.shape, ", new dims = ", scaled_width, scaled_height)
-    # print(" single pixel value = ", im_array[0])
+
+    if DEBUG:
+        print("======================================")
+        print(" resize_image (scaling factor = %s)" % scaling_factor)
+        print("--------------------------------------")
+        print("  %s -> (%s, %s) " % (im_array.shape, scaled_width, scaled_height))
+
     # resized_im = cv2.resize(im_array, (scaled_width, scaled_height), interpolation=cv2.INTER_NEAREST) ## for int arrays use INTER_NEAREST
     resized_im = cv2.resize(im_array, (scaled_width, scaled_height), interpolation=cv2.INTER_AREA) ## for noisy micrographs, default INTER_LINEAR does not work well, switch to INTER_AREA
+
     return resized_im
 
-def get_img(raw_im, scaling_factor):
+def get_grayscale_img(raw_im, scaling_factor):
     remapped = mrc2grayscale(raw_im)
-    print(" raw image range = ", np.min(raw_im), np.max(raw_im))
-    print(" remapped image range = ", np.min(remapped), np.max(remapped))
-    remapped = sigma_contrast(remapped, 3)
+    remapped = sigma_contrast(remapped, 4)
     scaled = resize_image(remapped, scaling_factor)
 
     return scaled 
 
 def get_mrcs_images(mrcs_file_path, scaling_factor, max_frames):
-    if DEBUG:
-        print(" Grabbing frames (%s max) from .MRCS = %s" % (max_frames, mrcs_file_path))
+    # if DEBUG:
+    #     print(" Grabbing frames (%s max) from .MRCS = %s" % (max_frames, mrcs_file_path))
     ## Unpack the data from the mrcs and pass it forward to the canvas objects
     img_stack = []
 
@@ -162,8 +186,7 @@ def get_mrcs_images(mrcs_file_path, scaling_factor, max_frames):
         
         ## deal with single frame .mrcs files as a special case
         if len(mrcs.data.shape) == 2:
-            # remapped = (255*(mrcs.data - np.min(mrcs.data))/np.ptp(mrcs.data)).astype(int) ## remap data from 0 -- 255
-            processed_img = get_img(mrcs.data.astype(np.float32), scaling_factor)
+            processed_img = get_grayscale_img(mrcs.data.astype(np.float32), scaling_factor)
             img_stack.append(processed_img)
         else:
             ## interate over the mrcs stack by index n
@@ -171,20 +194,16 @@ def get_mrcs_images(mrcs_file_path, scaling_factor, max_frames):
                 counter +=1
                 if counter > max_frames:
                     return img_stack
-                # remapped = (255*(mrcs.data[n] - np.min(mrcs.data[n]))/np.ptp(mrcs.data[n])).astype(int) ## remap data from 0 -- 255
-                # remapped = mrc2grayscale(mrcs.data[n])
-                # scaled = resize_image(remapped, scaling_factor)
-                # remapped = add_text_to_img(remapped, text = str(counter))
-                # img_stack.append(scaled)
-                processed_img = get_img(mrcs.data[n].astype(np.float32), scaling_factor)
+                processed_img = get_grayscale_img(mrcs.data[n].astype(np.float32), scaling_factor)
                 img_stack.append(processed_img)
 
-
-    if DEBUG:
+    if True:
+        print("======================================")
         print(" Extracted images from %s " % mrcs_file_path)
+        print("--------------------------------------")
         print("   >> %s images extracted" % len(img_stack))
         print("   >> dimensions (x, y) = (%s, %s) pixels " % (img_stack[0].shape[0], img_stack[0].shape[1]))
-        print("-------------------------------------------------------------")
+        print("--------------------------------------")
 
     return img_stack
 
@@ -223,6 +242,7 @@ class MainUI:
         # self.image_path = '' ## path to images
         self.input_mrcs = input_mrcs
         self.max_canvases = input_max_frames ## prevent loading an absurd amount of canvases on start up incase mrcs contains a shocking number of frames
+        self.x_dim, self.y_dim, self.z_dim, self.pixel_size, self.dtype = get_mrcs_info(input_mrcs)
 
         ## MENU BAR LAYOUT
         ## initialize the top menu bar
@@ -239,6 +259,7 @@ class MainUI:
         dropdown_options.add_command(label="Scaling factor", command = lambda: self.open_panel("scaling_factor"))
         dropdown_options.add_command(label="Number of columns", command = lambda: self.open_panel("column_number"))
         dropdown_options.add_command(label="Total frames to display", command = lambda: self.open_panel("max_canvases"))
+        dropdown_options.add_command(label="Invert selection", command = lambda: self.invert_selection())
 
         ## SCROLL FUNCTIONALITY USING FRAMES & CANVASES
         ## estimate how large to make the working window on load up
@@ -266,14 +287,37 @@ class MainUI:
         self.initialize_canvases()
 
         ## KEYBINDINGS
-        self.master.bind("<F1>", lambda event: self.update_canvases())
-        self.master.bind("<F2>", lambda event: self.redraw_canvases())
+        # self.master.bind("<F1>", lambda event: self.update_canvases())
+        # self.master.bind("<F2>", lambda event: self.redraw_canvases())
         self.master.bind('<Control-KeyRelease-s>', lambda event: self.save_selected_mrcs())
         self.master.bind('<Control-KeyRelease-q>', lambda event: self.quit())
+        self.master.bind('<i>', lambda event: self.invert_selection())
 
         ## Panel Instances
         self.optionPanel_instance = None
         return
+    
+    def invert_selection(self):
+        ## iterate over the selection list and flip each value 
+        for i in range(len(self.toggled_canvases)):
+            existing_state = self.toggled_canvases[i]
+            flipped_state = not existing_state
+            self.toggled_canvases[i] = flipped_state
+
+
+        if DEBUG:
+            number_selected = 0
+            for state in self.toggled_canvases:
+                if state:
+                    number_selected += 1
+            print("======================================")
+            print(" Invert selection " )
+            print("--------------------------------------")
+            print("  %s selected -> %s selected" % (len(self.toggled_canvases) - number_selected, number_selected))
+
+        self.redraw_canvas_toggles()
+
+        return 
 
     def open_panel(self, panelType = 'None'):
         ## use a switch-case statement logic to open the correct panel
@@ -305,7 +349,7 @@ class MainUI:
         return
 
     def determine_program_dimensions(self):
-        mrc_dimensions_x, mrc_dimensions_y, mrc_dimensions_z = get_mrcs_dimensions(self.input_mrcs)
+        mrc_dimensions_x, mrc_dimensions_y, mrc_dimensions_z = self.x_dim, self.y_dim, self.z_dim 
         scaled_frame_x = int(mrc_dimensions_x * self.scaling_factor)
         window_x = scaled_frame_x * self.max_columns + 50 ## add padding right to fit scrollbar
         ## get the resolution of the monitor
@@ -344,7 +388,7 @@ class MainUI:
         if output_mrcs_name == os.path.basename(self.input_mrcs):
             print(" ERROR : Cannot both open & write out `subset.mrcs', rename input file and try again.")
             return
-        mrc_dimensions = get_mrcs_dimensions(self.input_mrcs)
+        mrc_dimensions = (self.x_dim, self.y_dim, self.z_dim) 
         ## determine the output mrcs stack size
         stack_size = 0
         frame_num = 0
@@ -356,14 +400,19 @@ class MainUI:
             frame_num += 1
 
         ## determine the dtype of the array 
-        input_dtype = get_mrcs_dtype(self.input_mrcs)
+        input_dtype = self.dtype 
 
         if stack_size > 0:
             make_empty_mrcs(stack_size, (mrc_dimensions[0], mrc_dimensions[1]), input_dtype, output_mrcs_name)
             write_chosen_frames_to_empty_mrcs(self.input_mrcs, chosen_frames, output_mrcs_name)
+
+            print("======================================")
             print(" Written %s frames to: %s" % (stack_size, output_mrcs_name))
+            print("--------------------------------------")
         else:
+            print("======================================")
             print(" No frames were selected! No subset.mrcs file will be created...")
+            print("--------------------------------------")
 
         return
 
@@ -476,7 +525,7 @@ class MainUI:
 
     def quit(self):
         if DEBUG:
-            print(" CLOSING PROGRAM")
+            print(" Closing program...")
         sys.exit()
 
     def load_img_on_canvas(self, canvas, img_obj):

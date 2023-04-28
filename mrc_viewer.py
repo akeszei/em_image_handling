@@ -91,10 +91,15 @@ def sigma_contrast(im_array, sigma):
     minval = mean - (stdev * sigma)
     maxval = mean + (stdev * sigma)
 
+    if minval < 0: 
+        minval = 0
+    if maxval > 255:
+        maxval = 255
+
     if DEBUG:
         print(" sigma_contrast (s = %s)" % sigma)
 
-    ## remove pixles above/below the defined limits
+    ## remove pixels above/below the defined limits
     im_array = np.clip(im_array, minval, maxval)
     ## rescale the image into the range 0 - 255
     im_array = ((im_array - minval) / (maxval - minval)) * 255
