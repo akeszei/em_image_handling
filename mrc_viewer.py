@@ -37,7 +37,6 @@ def speedtest(method):
         print("... runtime = %.2f sec" % total_time_taken)
     return
 
-
 def add_scalebar(image_obj, scalebar_px, scalebar_stroke):
     """ Adds a scalebar to the input image and returns a new edited image
     PARAMETERS
