@@ -89,7 +89,13 @@ def save_jpeg_image(mrc_file, binning_factor):
         ## load the image data into a PIL.Image object
         im = Image.fromarray(remapped).convert('L')
         ## bin the image to the desired size
-        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), Image.Resampling.BILINEAR)
+        ## NOTE: newer PIL versions removed the Resampling attribute entirely
+        if not hasattr(Image, 'Resampling'): 
+            resampling_type = Image.BILINEAR
+        else:
+            resampling_type = Image.Resampling.BILINEAR
+
+        resized_im = im.resize((int(im.width/binning_factor), int(im.height/binning_factor)), resampling_type)
         jpg_name = os.path.splitext(mrc_file)[0] + '.jpg'
         # im.show()
         ## save the image to disc
