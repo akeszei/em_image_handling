@@ -269,7 +269,7 @@ if __name__ == "__main__":
     PARAMS, EXIT_CODE = cmdline_parser.parse(sys.argv, 1, PARAMS, FLAGS, FILES)
     if EXIT_CODE < 0:
         usage()
-        sys.exit()R
+        sys.exit()
     cmdline_parser.print_parameters(PARAMS, sys.argv)
 
     ## add a custom checks outside scope of general parser above
