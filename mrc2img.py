@@ -43,13 +43,21 @@ def get_mrc_data(file):
     """ file = .mrc file
         returns np.ndarray of the mrc data using mrcfile module
     """
+    try:
+        with mrcfile.open(file) as mrc:
+            ## get the raw image
+            image_data = mrc.data.astype(np.float32) ## need to cast it as a float32, since some mrc formats are uint16! (i.e. mode 6)
 
-    with mrcfile.open(file) as mrc:
-        ## get the raw image
-        image_data = mrc.data.astype(np.float32) ## need to cast it as a float32, since some mrc formats are uint16! (i.e. mode 6)
+            ## grab the pixel size from the header 
+            pixel_size = np.around(mrc.voxel_size.item(0)[0], decimals = 2)
+    except:
+        print(" There was a problem opening .MRC file (%s), try permissive mode. Consider fixing this file later!" % file)
+        with mrcfile.open(file, permissive = True) as mrc:
+            ## get the raw image
+            image_data = mrc.data.astype(np.float32) ## need to cast it as a float32, since some mrc formats are uint16! (i.e. mode 6)
 
-        ## grab the pixel size from the header 
-        pixel_size = np.around(mrc.voxel_size.item(0)[0], decimals = 2)
+            ## grab the pixel size from the header 
+            pixel_size = np.around(mrc.voxel_size.item(0)[0], decimals = 2)
 
     return image_data, pixel_size
 
