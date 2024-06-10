@@ -563,7 +563,10 @@ class MainUI:
             new_coordinates.append(new_coord)
 
         ## update the list of coordinates known to the instance
-        self.coordinates = new_coordinates
+        new_coord_dict = dict()
+        for coord in new_coordinates:
+            new_coord_dict[coord] = 'new_point'
+            self.coordinates = new_coord_dict
 
         ## redraw coordinates
         self.draw_image_coordinates()
@@ -989,7 +992,15 @@ class MainUI:
         return
 
     def debugging(self):
-        # print(" %s coordinates in dictionary" % len(self.coordinates))
+        print(" %s coordinates in dictionary" % len(self.coordinates))
+        display_num = 3
+        displayed = 0
+        for coord in self.coordinates:
+            displayed += 1
+            if displayed > display_num:
+                print("       ... ")
+                break 
+            print("    >> ", coord, self.coordinates[coord])
         # self.rescale_picked_coordinates(0.25, 0.2)
         # coord2freq(450, 450, self.display_data[0].width(), self.display_data[0].height(), self.pixel_size / self.scale_factor)
         return
