@@ -3,13 +3,12 @@
 ## Author: Alexander Keszei
 ## 2022-05-11: Version 1 finished
 ## 2023-03-27: Updated to improve filtering on fast implementation (switching interpolation mode on resize function was crucial)
+## 2024-06-10: Fixed bug when resizing image that causes a break in particle picking function
 
 """
 To Do:
     - Somehow lock the left/right keys from firing while loading an image. Basic attempts to do this by adding a flag on the start/end of the load_img function fails since the keystrokes are queued and fire after the function completes 
     - Add ctf toggle with 'c' keyboard press 
-    - Critical bug: resizing image causes a break in subsequent particle picking functionality (on_left_mouse_down)
-
 """ 
 
 DEBUG = False
