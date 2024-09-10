@@ -28,12 +28,13 @@ def usage():
     print(" Usage:")
     print("    $ mrc2img.py  input.mrc  output.jpg/png/tif/gif  <options> ")
     print(" Batch mode:")
-    print("    $ mrc2img.py  @.jpg/png/tif/gif")
+    print("    $ mrc2img.py  /path/to/mrc/@.jpg (or png,tif,gif)")
     print(" -----------------------------------------------------------------------------------------------")
     print(" Options (default in brackets): ")
     print("           --bin (4) : binning factor for image")
     print("    --scalebar (200) : add scalebar in Angstroms")
     print("       --angpix (-1) : Angstroms per pixel in .mrc image")
+    print("   --batch_out (dir) : Choose a different path to save output files when using batch mode")
     print("             --j (4) : Allow multiprocessing using indicated number of cores")
     print("===================================================================================================")
     sys.exit()
@@ -245,6 +246,7 @@ if __name__ == "__main__":
         'mrc_file' : str(),
         'output_file' : str(),
         'BATCH_MODE' : False,
+        'batch_output_dir' : '.',
         'BIN_IMAGE' : False,
         'binning_factor' : 4,
         'PRINT_SCALEBAR' : False,
@@ -263,6 +265,7 @@ if __name__ == "__main__":
     '--bin'      :  ('binning_factor'   ,    int(),     (1, 999),               False,              (True, 'BIN_IMAGE', True),             True ),
     '--scalebar' :  ('scalebar_angstroms',   int(),     (1, 9999),              False,              (True, 'PRINT_SCALEBAR', True),        True ),
     '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,              False,                                 True ),
+    '--batch_out':  ('batch_output_dir',     str(),     (),                False,              False,   True),
     '--j'        :  ('threads',              int(),     (0,999),                False,              (True, 'PARALLEL_PROCESSING', True),   True)
     }
 

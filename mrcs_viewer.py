@@ -227,6 +227,97 @@ def get_PhotoImage_obj(im_array):
     img_obj = ImageTk.PhotoImage(PIL_img)
     return img_obj
 
+def create_image_array(imgs, ncols = 5, padding = 2, order_to_print = None):
+    """
+    PARAMETERS 
+        imgs = list of image array data, e.g.: [ np.array(img1), ..., ]
+        ncols = int(); defining how many images should populate each row 
+        padding = int(); pixels distance between images 
+        order_to_print = list() of integers, indicating a specific order to display the images (i.e. [3, 2, 1, 0] would be reverse order); numbers should not repeat and the list length should match the input array of images! 
+    """
+
+    PADDING = padding
+
+    ## calculate the number of rows based on the number total images and the desired column number 
+    if len(imgs) <= ncols:
+        nrows = 1
+    else:
+        nrows = math.ceil(len(imgs) / ncols) 
+
+    ## get the image size (should be a perfect square so only grab one dimension)
+    image_box_size = imgs[0].shape[0]
+
+    print(" Prepare image array ::")
+    print("   # images = %s" % len(imgs))
+    print("   img box size = %s" % image_box_size)
+    print("   img array type & shape = ", type(imgs[0]), imgs[0].shape)
+    print("   array dimensios to print = %s x %s (col x rows)" % (ncols, nrows))
+
+    image_format = '.png'
+    ## prepare a blank canvas to draw upon, if .PNG format add empty alpha channel
+    if image_format.lower() == ".png":
+        canvas = np.full((nrows * image_box_size + PADDING * (nrows - 1), ncols * image_box_size + PADDING * (ncols - 1), 2), (0, 0), np.uint8) ## by convention, alpha is last channel
+    else:
+        canvas = np.full((nrows * image_box_size + PADDING * (nrows - 1), ncols * image_box_size + PADDING * (ncols - 1)), np.inf) ## by convention, top left of the image is coordinate (0, 0)
+
+    ## populate the canvas with each image at a specific location
+    counter = 0
+    if ncols > len(imgs):
+        num_imgs_to_print = len(imgs)
+    else:
+        num_imgs_to_print = nrows * ncols
+    for n in range(num_imgs_to_print):
+        col = counter % ncols
+        row = int(counter / ncols)
+        print("panel position (col, row) = (%s, %s)" % (col, row))
+
+        y_range = (row * image_box_size + (PADDING * row), (row * image_box_size) + image_box_size + (PADDING * row))
+        x_range = (col * image_box_size + (PADDING * col), (col * image_box_size) + image_box_size + (PADDING * col))
+
+        print("x and y ranges = ", x_range, y_range)
+
+        ## check if we have an image at this index
+        if len(imgs) - 1 >= counter:
+            ## 'stamp' the image onto the target location
+            if image_format.lower() == ".png":
+                ## add alpha channel data to the incoming image
+                alpha = np.full((image_box_size, image_box_size), 255, np.uint8) ## remove full transparency from area where image will be displayed
+                image_RGBA = np.dstack((imgs[n], alpha)) ## apply the new transparency values to the image area in question
+                canvas[ y_range[0]: y_range[1] , x_range[0] : x_range[1]] = image_RGBA
+
+            else:
+                canvas[ y_range[0]: y_range[1] , x_range[0] : x_range[1]] = imgs[n]
+
+        counter += 1
+
+    return canvas
+
+def add_scalebar(im, box_size, angpix, scalebar_size, indent_px = 8, stroke = 4):
+    scalebar_px = int(scalebar_size / angpix)
+    if scalebar_px > box_size:
+        print(" ERROR : Requested scalebar size (%s Ang, %s px) exceeds the dimensions of the image (%s px)!" % (scalebar_size, scalebar_px, box_size))
+        usage()
+
+    ## find the pixel range for the scalebar, typically 5 x 5 pixels up from bottom left
+    LEFT_INDENT = indent_px # px from left to indent the scalebar
+    BOTTOM_INDENT = indent_px # px from bottom to indent the scalebar
+    STROKE = stroke # px thickness of scalebar
+    x_range = (LEFT_INDENT, LEFT_INDENT + scalebar_px)
+    y_range = (box_size - BOTTOM_INDENT - STROKE, box_size - BOTTOM_INDENT)
+
+    ## set the pixels white for the scalebar
+    for x in range(x_range[0], x_range[1]):
+        for y in range(y_range[0], y_range[1]):
+            im[y][x] = 255
+
+    if DEBUG:
+        print(" Printing scalebar onto first panel:")
+        print("   >> %s pixels (%s Angstroms)" % (scalebar_px, scalebar_size))
+        print("   >> Indent scalebar %s pixels from bottom left edge of panel" % indent_px)
+        print("-------------------------------------------------------------")
+
+    return im
+
 
 class MainUI:
     def __init__(self, master, input_mrcs, input_scale, input_cols, input_max_frames):
@@ -252,6 +343,7 @@ class MainUI:
         dropdown_file = tk.Menu(menubar)
         menubar.add_cascade(label="File", menu = dropdown_file)
         dropdown_file.add_command(label="Save subset.mrcs", command=self.save_selected_mrcs)
+        dropdown_file.add_command(label="Save selected as .png", command = lambda: self.open_panel("save_png"))
         dropdown_file.add_command(label="Exit", command=self.quit)
         ## options dropdown menu
         dropdown_options = tk.Menu(menubar)
@@ -344,6 +436,13 @@ class MainUI:
             ## otherwise, do not create an instance
             else:
                 print(" OptionPanel is already open: ", self.optionPanel_instance)
+        elif panelType == "save_png":
+            ## create new instance if none exists
+            if self.optionPanel_instance is None:
+                self.optionPanel_instance = OptionPanel(self, panelType, self.scaling_factor)
+            ## otherwise, do not create an instance
+            else:
+                print(" An OptionPanel is already open, close it first: ", self.optionPanel_instance)
         else:
             return
         return
@@ -413,6 +512,65 @@ class MainUI:
             print("======================================")
             print(" No frames were selected! No subset.mrcs file will be created...")
             print("--------------------------------------")
+
+        return
+
+    def save_selected_mrcs_as_img(self, columns, SHOW_SCALEBAR, scalebar_size_ang):
+        if SHOW_SCALEBAR:
+            output_img_name = 'subset_%sApix_%sAngBar.png' % (self.pixel_size, scalebar_size_ang)
+        else:
+            output_img_name = 'subset_%sApix.png' % self.pixel_size
+        print(" Output .png filename = %s" % output_img_name)
+
+        # mrc_dimensions = (self.x_dim, self.y_dim, self.z_dim) 
+
+        ## determine the output mrcs stack size
+        stack_size = 0
+        frame_num = 0
+        chosen_frames = []
+        for switch in self.toggled_canvases:
+            if switch == True:
+                stack_size += 1
+                chosen_frames.append(frame_num)
+            frame_num += 1
+
+        # ## determine the dtype of the array 
+        # input_dtype = self.dtype 
+
+        imgs_list = []
+        if stack_size > 0:
+            for i in range(len(chosen_frames)):
+                ## grab the frame data we want to keep
+                frame_num = chosen_frames[i]
+                print(" ... grabbing frame %s" % (frame_num + 1))
+
+                ## sanity check there is a frame expected
+                if frame_num in range(0, len(self.canvas_data)):
+                    frame_canvas, frame_photoimage_obj = self.canvas_data[frame_num]
+                    img = ImageTk.getimage( frame_photoimage_obj ).convert('L')
+                    # img.show()
+                    # img.close()
+                    imgs_list.append(np.asarray(img))
+
+        ## if no stack size specified, then take all 2d classes forward 
+        else:
+            for frame_num in range(0, len(self.canvas_data)):
+                frame_canvas, frame_photoimage_obj = self.canvas_data[frame_num]
+                img = ImageTk.getimage( frame_photoimage_obj ).convert('L')
+                imgs_list.append(np.asarray(img))
+
+        display_img_as_array = create_image_array(imgs_list, ncols = columns)
+        if SHOW_SCALEBAR:
+            display_img_as_array = add_scalebar(display_img_as_array, imgs_list[0].shape[0], self.pixel_size, scalebar_size_ang)
+
+
+        im = PIL_Image.fromarray(display_img_as_array).convert('RGBA')
+        im.save(output_img_name)
+        # if DEBUG:
+        print(" Saved image: ")
+        print("   >> %s" % output_img_name)
+        print("-------------------------------------------------------------")
+        im.show()
 
         return
 
@@ -551,6 +709,8 @@ class OptionPanel(MainUI):
         self.panel = tk.Toplevel() # Make this object an accessible attribute
         self.panel.resizable(False, False)
         self.panel.title('Option menu')
+        self.SHOW_SCALEBAR = tk.BooleanVar(self.panel, True)
+
         if DEBUG:
             print(" Open option panel of type = ", option_type)
         if option_type == "column_number":
@@ -567,6 +727,10 @@ class OptionPanel(MainUI):
             self.panel.bind('<Return>', lambda event: self.update_column_number(self.input_text.get()))
             self.panel.bind('<KP_Enter>', lambda event: self.update_column_number(self.input_text.get())) # numpad 'Return' key
 
+            ## Set focus to the entry widget
+            self.input_text.focus()
+
+
         if option_type == "max_canvases":
             self.input_label = tk.Label(self.panel, font=("Helvetica", 12), text="# Frames to display: ")
             self.input_text = tk.Entry(self.panel, width=5, font=("Helvetica", 12), highlightcolor="blue", borderwidth=None, relief=tk.FLAT, foreground="black", background="light gray")
@@ -580,6 +744,10 @@ class OptionPanel(MainUI):
             ## Add some hotkeys for ease of use
             self.panel.bind('<Return>', lambda event: self.update_max_frames(self.input_text.get()))
             self.panel.bind('<KP_Enter>', lambda event: self.update_max_frames(self.input_text.get())) # numpad 'Return' key
+
+            ## Set focus to the entry widget
+            self.input_text.focus()
+
 
         if option_type == "scaling_factor":
             self.input_label = tk.Label(self.panel, font=("Helvetica", 12), text="Scaling factor: ")
@@ -595,9 +763,35 @@ class OptionPanel(MainUI):
             self.panel.bind('<Return>', lambda event: self.update_scaling_factor(self.input_text.get()))
             self.panel.bind('<KP_Enter>', lambda event: self.update_scaling_factor(self.input_text.get())) # numpad 'Return' key
 
+            ## Set focus to the entry widget
+            self.input_text.focus()
 
-        ## Set focus to the entry widget
-        self.input_text.focus()
+
+        if option_type == "save_png":
+            ## Generate widgets 
+            self.label_columns = tk.Label(self.panel, font=("Helvetica", 12), text="Columns: ")
+            self.entry_columns = tk.Entry(self.panel, width=5, font=("Helvetica", 12), highlightcolor="blue", borderwidth=None, relief=tk.FLAT, foreground="black", background="light gray")
+            self.label_scalebar = tk.Label(self.panel, font=("Helvetica", 12), text="Scalebar (A): ")
+            self.entry_scalebar = tk.Entry(self.panel, width=5, font=("Helvetica", 12), highlightcolor="blue", borderwidth=None, relief=tk.FLAT, foreground="black", background="light gray")
+            self.show_picks_TOGGLE = tk.Checkbutton(self.panel, text='Show scalebar?', variable=self.SHOW_SCALEBAR, onvalue=True, offvalue=False)            
+            self.button_save_img = tk.Button(self.panel, text="Save .png", command= lambda: self.save_selected_as_png(), width=8)
+
+            ## set defaults 
+            self.entry_columns.insert(-1, '6')
+            self.entry_scalebar.insert(-1, '250')
+
+            ## Pack widgets
+            self.label_columns.grid(column=0, row=0)#, sticky = tk.W)
+            self.entry_columns.grid(column=1, row=0)#, sticky = tk.W)
+            self.show_picks_TOGGLE.grid(column=0, row = 1)
+            self.label_scalebar.grid(column = 0, row = 2)
+            self.entry_scalebar.grid(column = 1, row = 2)
+            self.button_save_img.grid(column=2, row=3) #, sticky = tk.W)
+
+            ## Add some hotkeys for ease of use
+            # self.panel.bind('<Return>', lambda event: self.update_scaling_factor(self.input_text.get()))
+            # self.panel.bind('<KP_Enter>', lambda event: self.update_scaling_factor(self.input_text.get())) # numpad 'Return' key
+
 
         ## add an exit function to the closing of this top level window
         self.panel.protocol("WM_DELETE_WINDOW", self.close)
@@ -630,6 +824,26 @@ class OptionPanel(MainUI):
             self.close()
         return
 
+    def save_selected_as_png(self):
+        ## get the number of columns 
+        try:
+            columns = int(self.entry_columns.get())
+        except:
+            print(" Could not parse input to Columns widget (%s), try using an integer" % self.entry_columns.get())
+        ## get the boolean for scalebar 
+        SHOW_SCALEBAR = self.SHOW_SCALEBAR.get()
+        ## if true, get the size of the desired scalebar
+        try:
+            scalebar_size_ang = int(self.entry_scalebar.get())
+        except:
+            print(" Could not parse input to scalbar size widget (%s), try using an integer" % self.entry_scalebar.get())
+
+        print(" Columns = %s " % columns, type(columns))
+        print(" Show scalebar = %s" % SHOW_SCALEBAR, type(SHOW_SCALEBAR))
+        print(" Scalebar size (ang) = %s" % scalebar_size_ang, type(scalebar_size_ang))
+        self.mainUI.save_selected_mrcs_as_img(columns, SHOW_SCALEBAR, scalebar_size_ang)
+        return 
+
     def close(self):
         ## unset the panel instance before destroying this instance
         self.mainUI.optionPanel_instance = None
@@ -647,7 +861,7 @@ if __name__ == '__main__':
     from tkinter.messagebox import showerror
     from tkinter import ttk
     import numpy as np
-    import os, string, sys
+    import os, string, sys, math
     from PIL import Image as PIL_Image
     from PIL import ImageTk
     import re ## for use of re.findall() function to extract numbers from strings
