@@ -89,7 +89,7 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
     import PIL.Image as Image
 
     ## check file exists in the cwd
-    if not os.path.isfile('./' + mrc_filename):
+    if not os.path.isfile(mrc_filename):
         print(" ERROR :: File (%s) does not exist in working directory!" % mrc_filename)
         sys.exit()
 
