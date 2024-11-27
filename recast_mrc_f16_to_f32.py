@@ -44,4 +44,4 @@ if __name__ == "__main__":
     save_mrc_image(img_data, save_fname, angpix)
 
 ## Example usage: 
-##      $ for m in *.mrc; do ../cast_f16_to_f32.py $m float32/; done
+##      $ for m in *.mrc; do ../recast_f16_to_f32.py $m float32/; done
