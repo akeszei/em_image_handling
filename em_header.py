@@ -119,6 +119,29 @@ def get_ser_data(file, HEADER_INFO):
     HEADER_INFO['mean'] = ser['data'].mean()
     return 
 
+def get_tif_data(file, HEADER_INFO):
+
+    ## load the tiff file as an accessible object without opening it (avoiding memory problems)
+    tif = tifffile.TiffFile(file)
+    ## grab information from the object 
+    y_dim, x_dim = tif.pages[0].shape[0], tif.pages[0].shape[1]
+    z_dim = len(tif.pages)
+
+    HEADER_INFO['image_dimensions'] = '(%s, %s, %s)' % (x_dim, y_dim, z_dim)
+    HEADER_INFO['filename'] = file
+
+    ## import element tree for XML parsing
+    import xml.etree.ElementTree as ET 
+    ## read the header XML data and parse important information from it (based off Falcon4i camera output )
+    for tag in tif.pages[0].tags:
+        if tag.name == "XResolution":
+            HEADER_INFO['angpix'] = tag.value
+
+        # print("name, value = ", tag.name, tag.value)
+
+
+    return 
+
 
 def get_mrc_data(file, HEADER_INFO):
     with mrcfile.open(file) as mrc:
@@ -224,7 +247,7 @@ if __name__ == "__main__":
     }
 
     FILES = { ## cmd line index    allowed extensions   ## can launch batch mode
-        'input_file' : (  -1,         ['.ser','.mrc','.eer','.mrcs'],  False)
+        'input_file' : (  -1,         ['.ser','.mrc','.eer','.mrcs','.tif'],  False)
         }
     ##################################
 
@@ -246,7 +269,7 @@ if __name__ == "__main__":
     }
 
     ## determine which filetype was submitted and pass it to the appropriate function for parsing
-    extension = os.path.splitext(PARAMS['input_file'])[1]
+    extension = os.path.splitext(PARAMS['input_file'])[-1]
     if extension == '.mrc':
         print("MRC submitted")
         get_mrc_data(PARAMS['input_file'], HEADER_INFO)
@@ -259,5 +282,9 @@ if __name__ == "__main__":
     elif extension == '.mrcs':
         get_mrcs_data(PARAMS['input_file'], HEADER_INFO)
         print("MRCS submitted")
+    elif extension == '.tif':
+        get_tif_data(PARAMS['input_file'], HEADER_INFO)
+        print("TIF submitted")
+
 
     print_header(HEADER_INFO, PARAMS)
