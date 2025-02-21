@@ -138,6 +138,7 @@ def get_tif_data(file, HEADER_INFO):
             HEADER_INFO['angpix'] = tag.value
 
         # print("name, value = ", tag.name, tag.value)
+        # print("   tag dtype = ", tag.dtype)
 
 
     return 
