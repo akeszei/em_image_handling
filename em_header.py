@@ -100,11 +100,9 @@ def get_mrcs_data(file, HEADER_INFO):
         HEADER_INFO['mean'] = mrcs.header.dmean
 
 
-        print("MRC mode = ", mrcs.header.mode)
+        # print("MRC mode = ", mrcs.header.mode)
         # mrc.print_header()
     return 
-
-
 
 def get_ser_data(file, HEADER_INFO):
     ## use serReader module to parse the .SER file data into memory
@@ -143,10 +141,9 @@ def get_tif_data(file, HEADER_INFO):
 
     return 
 
-
 def get_mrc_data(file, HEADER_INFO):
     with mrcfile.open(file) as mrc:
-        HEADER_INFO['image_dimensions'] = '(%s, %s, %s)' % (mrc.header.nx, mrc.header.ny, mrc.header.nz)
+        HEADER_INFO['image_dimensions'] = '%s %s %s' % (mrc.header.nx, mrc.header.ny, mrc.header.nz)
         HEADER_INFO['filename'] = file
         HEADER_INFO['angpix'] = mrc.voxel_size.x
         HEADER_INFO['min'] = mrc.header.dmin
@@ -154,22 +151,21 @@ def get_mrc_data(file, HEADER_INFO):
         HEADER_INFO['mean'] = mrc.header.dmean
 
 
-        print("MRC mode = ", mrc.header.mode)
+        # print("MRC mode = ", mrc.header.mode)
         # mrc.print_header()
     return 
 
 def print_header(HEADER_INFO, PARAMS):
+    if PARAMS['ANGPIX_ONLY']:
+        print("%.2f" % HEADER_INFO['angpix'])
+        return 
+
+    if PARAMS['DIMENSIONS_ONLY']:
+        print("%s" % (HEADER_INFO['image_dimensions']))
+        return 
+
     for key in HEADER_INFO:
-        if PARAMS['ANGPIX_ONLY']:
-            if key == 'angpix':
-                print("  %s = %s" % (key, HEADER_INFO[key]))
-                return 
-        if PARAMS['DIMENSIONS_ONLY']:
-            if key == 'image_dimensions':
-                print("  %s = %s" % (key, HEADER_INFO[key]))
-                return 
-        else:
-            print("  %s = %s" % (key, HEADER_INFO[key]))
+        print("  %s = %s" % (key, HEADER_INFO[key]))
 
 
 #############################
@@ -257,7 +253,7 @@ if __name__ == "__main__":
         # print("Could not correctly parse cmd line")
         usage()
         sys.exit()
-    cmdline_parser.print_parameters(PARAMS, sys.argv)
+    # cmdline_parser.print_parameters(PARAMS, sys.argv)
 
     ## prepare a general header dictionary we want to populate
     HEADER_INFO = {
@@ -272,20 +268,20 @@ if __name__ == "__main__":
     ## determine which filetype was submitted and pass it to the appropriate function for parsing
     extension = os.path.splitext(PARAMS['input_file'])[-1]
     if extension == '.mrc':
-        print("MRC submitted")
+        # print("MRC submitted")
         get_mrc_data(PARAMS['input_file'], HEADER_INFO)
     elif extension == '.ser':
         get_ser_data(PARAMS['input_file'], HEADER_INFO)
-        print("SER submitted")
+        # print("SER submitted")
     elif extension == '.eer':
         get_eer_data(PARAMS['input_file'], HEADER_INFO)
-        print("EER submitted")
+        # print("EER submitted")
     elif extension == '.mrcs':
         get_mrcs_data(PARAMS['input_file'], HEADER_INFO)
-        print("MRCS submitted")
+        # print("MRCS submitted")
     elif extension == '.tif':
         get_tif_data(PARAMS['input_file'], HEADER_INFO)
-        print("TIF submitted")
+        # print("TIF submitted")
 
 
     print_header(HEADER_INFO, PARAMS)
