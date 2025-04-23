@@ -293,6 +293,10 @@ def create_image_array(imgs, ncols = 5, padding = 2, order_to_print = None):
     return canvas
 
 def add_scalebar(im, box_size, angpix, scalebar_size, indent_px = 8, stroke = 4):
+    if angpix == 0:
+        print(" ERROR :: Pixel size not known (currently detected as 0). Will not add scalebar.")
+        return im
+
     scalebar_px = int(scalebar_size / angpix)
     if scalebar_px > box_size:
         print(" ERROR : Requested scalebar size (%s Ang, %s px) exceeds the dimensions of the image (%s px)!" % (scalebar_size, scalebar_px, box_size))
@@ -515,7 +519,8 @@ class MainUI:
 
         return
 
-    def save_selected_mrcs_as_img(self, columns, SHOW_SCALEBAR, scalebar_size_ang):
+    def save_selected_mrcs_as_img(self, columns, SHOW_SCALEBAR, scalebar_size_ang, SAVE_AS_INDIVIDUAL_IMGS):
+            
         if SHOW_SCALEBAR:
             output_img_name = 'subset_%sApix_%sAngBar.png' % (self.pixel_size, scalebar_size_ang)
         else:
@@ -559,18 +564,35 @@ class MainUI:
                 img = ImageTk.getimage( frame_photoimage_obj ).convert('L')
                 imgs_list.append(np.asarray(img))
 
-        display_img_as_array = create_image_array(imgs_list, ncols = columns)
-        if SHOW_SCALEBAR:
-            display_img_as_array = add_scalebar(display_img_as_array, imgs_list[0].shape[0], self.pixel_size, scalebar_size_ang)
+        ## once we have accumulated all the images we want to write out, determine if we should save them in sequence or together as an array before publishing 
+        if SAVE_AS_INDIVIDUAL_IMGS:
+            ## modify the name to allow me to add each frame count to it
+            output_img_basename = os.path.splitext(output_img_name)[0]
+            count = 0
+            for img_array in imgs_list:
+                output_name = output_img_basename + "_" + str(count) + ".png"
+                count += 1
+                if SHOW_SCALEBAR:
+                    img_array = add_scalebar(img_array, img_array.shape[0], self.pixel_size, scalebar_size_ang)
+                im = PIL_Image.fromarray(img_array).convert('RGBA')
+                im.save(output_name)
+                print(" Saved image: ")
+                print("   >> %s" % (output_name))
 
 
-        im = PIL_Image.fromarray(display_img_as_array).convert('RGBA')
-        im.save(output_img_name)
-        # if DEBUG:
-        print(" Saved image: ")
-        print("   >> %s" % output_img_name)
-        print("-------------------------------------------------------------")
-        im.show()
+        else:
+            display_img_as_array = create_image_array(imgs_list, ncols = columns)
+            if SHOW_SCALEBAR:
+                display_img_as_array = add_scalebar(display_img_as_array, imgs_list[0].shape[0], self.pixel_size, scalebar_size_ang)
+
+
+            im = PIL_Image.fromarray(display_img_as_array).convert('RGBA')
+            im.save(output_img_name)
+            # if DEBUG:
+            print(" Saved image: ")
+            print("   >> %s" % output_img_name)
+            print("-------------------------------------------------------------")
+            im.show()
 
         return
 
@@ -710,6 +732,7 @@ class OptionPanel(MainUI):
         self.panel.resizable(False, False)
         self.panel.title('Option menu')
         self.SHOW_SCALEBAR = tk.BooleanVar(self.panel, True)
+        self.SAVE_AS_INDIVIDUAL_IMGS = tk.BooleanVar(self.panel, False)
 
         if DEBUG:
             print(" Open option panel of type = ", option_type)
@@ -769,11 +792,12 @@ class OptionPanel(MainUI):
 
         if option_type == "save_png":
             ## Generate widgets 
+            self.save_individual_imgs_TOGGLE = tk.Checkbutton(self.panel, text='Save as separate imgs?', variable=self.SAVE_AS_INDIVIDUAL_IMGS, onvalue=True, offvalue=False)
             self.label_columns = tk.Label(self.panel, font=("Helvetica", 12), text="Columns: ")
             self.entry_columns = tk.Entry(self.panel, width=5, font=("Helvetica", 12), highlightcolor="blue", borderwidth=None, relief=tk.FLAT, foreground="black", background="light gray")
             self.label_scalebar = tk.Label(self.panel, font=("Helvetica", 12), text="Scalebar (A): ")
             self.entry_scalebar = tk.Entry(self.panel, width=5, font=("Helvetica", 12), highlightcolor="blue", borderwidth=None, relief=tk.FLAT, foreground="black", background="light gray")
-            self.show_picks_TOGGLE = tk.Checkbutton(self.panel, text='Show scalebar?', variable=self.SHOW_SCALEBAR, onvalue=True, offvalue=False)            
+            self.show_picks_TOGGLE = tk.Checkbutton(self.panel, text='Show scalebar?', variable=self.SHOW_SCALEBAR, onvalue=True, offvalue=False) 
             self.button_save_img = tk.Button(self.panel, text="Save .png", command= lambda: self.save_selected_as_png(), width=8)
 
             ## set defaults 
@@ -781,12 +805,13 @@ class OptionPanel(MainUI):
             self.entry_scalebar.insert(-1, '250')
 
             ## Pack widgets
-            self.label_columns.grid(column=0, row=0)#, sticky = tk.W)
-            self.entry_columns.grid(column=1, row=0)#, sticky = tk.W)
-            self.show_picks_TOGGLE.grid(column=0, row = 1)
-            self.label_scalebar.grid(column = 0, row = 2)
-            self.entry_scalebar.grid(column = 1, row = 2)
-            self.button_save_img.grid(column=2, row=3) #, sticky = tk.W)
+            self.save_individual_imgs_TOGGLE.grid(column=0, row=0)
+            self.label_columns.grid(column=0, row=1)#, sticky = tk.W)
+            self.entry_columns.grid(column=1, row=1)#, sticky = tk.W)
+            self.show_picks_TOGGLE.grid(column=0, row = 2)
+            self.label_scalebar.grid(column = 0, row = 3)
+            self.entry_scalebar.grid(column = 1, row = 3)
+            self.button_save_img.grid(column=2, row=4) #, sticky = tk.W)
 
             ## Add some hotkeys for ease of use
             # self.panel.bind('<Return>', lambda event: self.update_scaling_factor(self.input_text.get()))
@@ -836,12 +861,15 @@ class OptionPanel(MainUI):
         try:
             scalebar_size_ang = int(self.entry_scalebar.get())
         except:
-            print(" Could not parse input to scalbar size widget (%s), try using an integer" % self.entry_scalebar.get())
+            print(" Could not parse input to scalebar size widget (%s), try using an integer" % self.entry_scalebar.get())
+
+        ## get the boolean if imgs should be saved as separate imgs
+        SAVE_AS_INDIVIDUAL_IMGS = self.SAVE_AS_INDIVIDUAL_IMGS.get()
 
         print(" Columns = %s " % columns, type(columns))
         print(" Show scalebar = %s" % SHOW_SCALEBAR, type(SHOW_SCALEBAR))
         print(" Scalebar size (ang) = %s" % scalebar_size_ang, type(scalebar_size_ang))
-        self.mainUI.save_selected_mrcs_as_img(columns, SHOW_SCALEBAR, scalebar_size_ang)
+        self.mainUI.save_selected_mrcs_as_img(columns, SHOW_SCALEBAR, scalebar_size_ang, SAVE_AS_INDIVIDUAL_IMGS)
         return 
 
     def close(self):
