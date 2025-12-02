@@ -155,6 +155,30 @@ def get_mrc_data(file, HEADER_INFO):
         # mrc.print_header()
     return 
 
+def get_gain_data(file, HEADER_INFO):
+
+    ## load the tiff file as an accessible object without opening it (avoiding memory problems)
+    tif = tifffile.TiffFile(file)
+    ## grab information from the object 
+    y_dim, x_dim = tif.pages[0].shape[0], tif.pages[0].shape[1]
+    z_dim = len(tif.pages)
+
+    HEADER_INFO['image_dimensions'] = '(%s, %s, %s)' % (x_dim, y_dim, z_dim)
+    HEADER_INFO['filename'] = file
+
+    ## import element tree for XML parsing
+    import xml.etree.ElementTree as ET 
+    ## read the header XML data and parse important information from it (based off Falcon4i camera output )
+    for tag in tif.pages[0].tags:
+        if tag.name == "XResolution":
+            HEADER_INFO['angpix'] = tag.value
+
+        print("name, value = ", tag.name, tag.value)
+        # print("   tag dtype = ", tag.dtype)
+
+
+    return 
+
 def print_header(HEADER_INFO, PARAMS):
     if PARAMS['ANGPIX_ONLY']:
         print("%.2f" % HEADER_INFO['angpix'])
@@ -244,7 +268,7 @@ if __name__ == "__main__":
     }
 
     FILES = { ## cmd line index    allowed extensions   ## can launch batch mode
-        'input_file' : (  -1,         ['.ser','.mrc','.eer','.mrcs','.tif'],  False)
+        'input_file' : (  -1,         ['.ser','.mrc','.eer','.mrcs','.tif','.gain'],  False)
         }
     ##################################
 
@@ -282,6 +306,8 @@ if __name__ == "__main__":
     elif extension == '.tif':
         get_tif_data(PARAMS['input_file'], HEADER_INFO)
         # print("TIF submitted")
+    elif extension == '.gain':
+        get_gain_data(PARAMS['input_file'], HEADER_INFO)
 
 
     print_header(HEADER_INFO, PARAMS)
