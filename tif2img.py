@@ -87,14 +87,14 @@ def get_pixel_size(xml_tree):
             angpix = angstroms_per_pixel_rounded
     if angpix == None:
         print(" !! ERROR :: Could not find the attributes for the given header: %s, confirm there is an attribute for this header in the file!" % search_string)
-        return 
+        return 1
     return angpix
 
 def get_tif_data(file):
     """ file = .tif file name & path 
         returns np.ndarray of the mrc data using mrcfile module
     """
-
+    pixel_size = -1 ## set a negative value initially 
     try:
         with tifffile.TiffFile(file) as tif:
             print(" Opening tif file: %s" % file)
@@ -107,7 +107,7 @@ def get_tif_data(file):
                         pixel_size = get_pixel_size(xml_tree)
                         print(" ... pixel size from header =", pixel_size)
     except:
-        print(" There was a prblem reading the header for the input .TIF file (%s)" % file)
+        print(" There was a problem reading the header for the input .TIF file (%s)" % file)
         exit()
 
     try:
@@ -115,6 +115,11 @@ def get_tif_data(file):
     except:
         print(" There was a problem reading the .TIF file as an image ")
         exit()
+
+    ## warn user if pixel size remains negative, so set it to 1 (default)
+    if pixel_size <= 0:
+        print(" !! WARNING :: Could not parse pixel size from image" ) #. Will use default value of 1" )
+        # print(" Supply --angpix <n> value as an argument to properly display scalebars etc")
 
     return image_data, pixel_size
 
@@ -265,6 +270,24 @@ def check_dependencies():
         print(" ERROR :: Failed to import 'mrcfile'. Try: pip install mrcfile")
         sys.exit()
 
+def print_full_header(file):
+    """ A function to interrogate the contents of a tif file outside of any other functions. For debugging or finding what headers are printed etc...
+    """
+
+    print("Full header for file: %s" % file)
+
+    with tifffile.TiffFile(file) as tif:
+        for page in tif.pages:
+            for tag in page.tags:
+                print("         %s :: %s" % (tag.name, tag.value))
+                # if tag.name == 'FEI_TITAN':
+                #     ## pass the XML data from the FEI_TITAN tag to a parser to grab the pixel value for x 
+                #     xml_tree = ET.fromstring(tag.value)
+                #     pixel_size = get_pixel_size(xml_tree)
+                #     print(" ... pixel size from header =", pixel_size)
+
+
+    return 
 
 #############################
 ###     RUN BLOCK
@@ -294,6 +317,7 @@ if __name__ == "__main__":
 
     ##################################
 
+
     ##################################
     ## ASSIGN DEFAULT VARIABLES
     ##################################
@@ -313,7 +337,7 @@ if __name__ == "__main__":
     ##################################
 
     ##################################
-    ## SET UP EXPECTED DATA FOR PARSER
+    #region SET UP EXPECTED DATA FOR PARSER
     ##################################
     FLAGS = {
 ##    flag      :  (PARAMS_key,       data_type,  legal_entries/range,    toggle for entry,   intrinsic toggle,                    has_defaults)
@@ -326,13 +350,15 @@ if __name__ == "__main__":
 
 
     FILES = { ## cmd line index    allowed extensions                                   ## can launch batch mode
-        'image_file' : (      1,              '.tif',          False),
+        'image_file' : (      1,              ['.tif'],          False),
         'output_file' : (   2,              ['.jpg', '.jpeg', '.png', '.tif', '.gif'],  True)
         }
+    #endregion 
     ##################################
 
     start_time = time.time()
-    PARAMS, EXIT_CODE = cmdline_parser.parse(sys.argv, 1, PARAMS, FLAGS, FILES)
+    min_args = 1
+    PARAMS, EXIT_CODE = cmdline_parser.parse(sys.argv, min_args, PARAMS, FLAGS, FILES, DEBUG=DEBUG)
     if EXIT_CODE < 0:
         usage()
         sys.exit()

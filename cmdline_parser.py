@@ -15,7 +15,7 @@ DEBUG = False
 ##################################
 ## FUNCTIONS
 ##################################
-def parse(cmdline, min_args, PARAMS, FLAGS, FILES):
+def parse(cmdline, min_args, PARAMS, FLAGS, FILES, DEBUG = DEBUG):
     EXIT_CODE = -1 ## -1 = failed, 1 = passed
     if DEBUG:
         print("Command line arguments = ")
@@ -61,6 +61,11 @@ def parse(cmdline, min_args, PARAMS, FLAGS, FILES):
         for file in FILES:
             cmdline_index = FILES[file][0]
             extensions = FILES[file][1]
+            ## sanity check the requested index for the expected file can actually exist 
+            if cmdline_index >= len(cmdline):
+                print(" !! ERROR :: Could not find input file (allowed extensions = %s) expected at argument $%s" % (extensions, cmdline_index))
+                return PARAMS, EXIT_CODE
+
             if cmdline_index > 0:
                 ## inflexible indexing, check extension at specific position on cmd line
                 MATCH = False
