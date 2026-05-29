@@ -62,53 +62,26 @@ def get_mrc_data(file):
 
     return image_data, pixel_size
 
-# def apply_sigma_contrast(im_data, sigma_value):
-#     """
-#         Apply sigma contrast to an image.
-#     PARAMETERS
-#         im_data = 2d np.array
-#         sigma_value = float; typical values are 3 - 4
-#     RETURNS
-#         2d np.array, where values from original array are rescaled based on the sigma contrast value
-#     """
-#     ## 1. find the standard deviation of the data set
-#     im_stdev = np.std(im_data)
-#     ## 2. find the mean of the dataset
-#     im_mean = np.mean(im_data)
-#     ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
-#     min = im_mean - (sigma_value * im_stdev)
-#     max = im_mean + (sigma_value * im_stdev)
-#     ## 4. clip the dataset to the min and max values
-#     im_contrast_adjusted = np.clip(im_data, min, max)
-
-#     return im_contrast_adjusted
-
-def sigma_contrast(im_array, sigma):
-    """ Rescale the image intensity levels to a range defined by a sigma value (the # of
-        standard deviations to keep). Can perform better than auto_contrast when there is
-        a lot of dark pixels throwing off the level balancing.
+def apply_sigma_contrast(im_data, sigma_value):
     """
-    import numpy as np
-    stdev = np.std(im_array)
-    mean = np.mean(im_array)
-    minval = mean - (stdev * sigma)
-    maxval = mean + (stdev * sigma)
+        Apply sigma contrast to an image.
+    PARAMETERS
+        im_data = 2d np.array
+        sigma_value = float; typical values are 3 - 4
+    RETURNS
+        2d np.array, where values from original array are rescaled based on the sigma contrast value
+    """
+    ## 1. find the standard deviation of the data set
+    im_stdev = np.std(im_data)
+    ## 2. find the mean of the dataset
+    im_mean = np.mean(im_data)
+    ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
+    min = im_mean - (sigma_value * im_stdev)
+    max = im_mean + (sigma_value * im_stdev)
+    ## 4. clip the dataset to the min and max values
+    im_contrast_adjusted = np.clip(im_data, min, max)
 
-    if minval < 0: 
-        minval = 0
-    if maxval > 255:
-        maxval = 255
-
-    if DEBUG:
-        print(" sigma_contrast (s = %s)" % sigma)
-
-    ## remove pixels above/below the defined limits
-    im_array = np.clip(im_array, minval, maxval)
-    ## rescale the image into the range 0 - 255
-    im_array = ((im_array - minval) / (maxval - minval)) * 255
-
-    return im_array.astype('uint8')
-
+    return im_contrast_adjusted
 
 def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, input_angpix):
     check_dependencies()
@@ -136,7 +109,7 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         PRINT_SCALEBAR = False
 
     ## apply sigma contrast to the image
-    im_contrast_adjusted = sigma_contrast(mrc_data, 3)
+    im_contrast_adjusted = apply_sigma_contrast(mrc_data, 3)
 
     ## rescale the image data to grayscale range (0,255)
     remapped = (255*(im_contrast_adjusted - np.min(im_contrast_adjusted))/np.ptp(im_contrast_adjusted)).astype(np.uint8) ## remap data from 0 -- 255
