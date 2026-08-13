@@ -31,11 +31,13 @@ def usage():
     print("    $ mrc2img.py  /path/to/mrc/@.jpg (or png,tif,gif)")
     print(" -----------------------------------------------------------------------------------------------")
     print(" Options (default in brackets): ")
-    print("           --bin (4) : binning factor for image")
-    print("    --scalebar (200) : add scalebar in Angstroms")
-    print("       --angpix (-1) : Angstroms per pixel in .mrc image")
-    print("   --batch_out (dir) : Choose a different path to save output files when using batch mode")
-    print("             --j (4) : Allow multiprocessing using indicated number of cores")
+    print("             --bin (4) : binning factor for image")
+    print("      --scalebar (200) : add scalebar in Angstroms")
+    print("         --angpix (-1) : Angstroms per pixel in .mrc image")
+    print(" --sigma_contrast (-1) : Use fast sigma contrast instead of low pass filtering")
+    print("        --lowpass (-1) : Apply a lowpass filter (-1 means no filtering)")
+    print("     --batch_out (dir) : Choose a different path to save output files when using batch mode")
+    print("               --j (4) : Allow multiprocessing using indicated number of cores")
     print("===================================================================================================")
     sys.exit()
     return
@@ -62,28 +64,54 @@ def get_mrc_data(file):
 
     return image_data, pixel_size
 
-def apply_sigma_contrast(im_data, sigma_value):
+def sigma_contrast(im_array, sigma):
+    """ Rescale the image intensity levels to a range defined by a sigma value (the # of
+        standard deviations to keep). Can perform better than auto_contrast when there is
+        a lot of dark pixels throwing off the level balancing.
     """
-        Apply sigma contrast to an image.
-    PARAMETERS
-        im_data = 2d np.array
-        sigma_value = float; typical values are 3 - 4
-    RETURNS
-        2d np.array, where values from original array are rescaled based on the sigma contrast value
-    """
-    ## 1. find the standard deviation of the data set
-    im_stdev = np.std(im_data)
-    ## 2. find the mean of the dataset
-    im_mean = np.mean(im_data)
-    ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
-    min = im_mean - (sigma_value * im_stdev)
-    max = im_mean + (sigma_value * im_stdev)
-    ## 4. clip the dataset to the min and max values
-    im_contrast_adjusted = np.clip(im_data, min, max)
+    import numpy as np
+    stdev = np.std(im_array)
+    mean = np.mean(im_array)
+    minval = mean - (stdev * sigma)
+    maxval = mean + (stdev * sigma)
 
-    return im_contrast_adjusted
+    if minval < 0: 
+        minval = 0
+    if maxval > 255:
+        maxval = 255
 
-def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, input_angpix):
+    if DEBUG:
+        print(" sigma_contrast (s = %s)" % sigma)
+
+    ## remove pixels above/below the defined limits
+    im_array = np.clip(im_array, minval, maxval)
+    ## rescale the image into the range 0 - 255
+    im_array = ((im_array - minval) / (maxval - minval)) * 255
+
+    return im_array.astype('uint8')
+
+# def apply_sigma_contrast(im_data, sigma_value):
+#     """
+#         Apply sigma contrast to an image.
+#     PARAMETERS
+#         im_data = 2d np.array
+#         sigma_value = float; typical values are 3 - 4
+#     RETURNS
+#         2d np.array, where values from original array are rescaled based on the sigma contrast value
+#     """
+#     ## 1. find the standard deviation of the data set
+#     im_stdev = np.std(im_data)
+#     ## 2. find the mean of the dataset
+#     im_mean = np.mean(im_data)
+#     ## 3. define the upper and lower limit of the image using a chosen sigma contrast value
+#     min = im_mean - (sigma_value * im_stdev)
+#     max = im_mean + (sigma_value * im_stdev)
+#     ## 4. clip the dataset to the min and max values
+#     im_contrast_adjusted = np.clip(im_data, min, max)
+
+#     return im_contrast_adjusted
+
+def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor, PRINT_SCALEBAR, scalebar_angstroms, input_angpix, input_sigma_contrast, input_lowpass_filter):
     check_dependencies()
     # need to recast imported module as the general keyword to use
     import PIL.Image as Image
@@ -95,6 +123,10 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
 
     ## read data from mrc file 
     mrc_data, mrc_pixel_size = get_mrc_data(mrc_filename)
+    print(" mrc_pixel_size = %s" % mrc_pixel_size, " | mrc_data = ", mrc_data.shape)
+
+    ## rescale the image data to grayscale range (0,255)
+    mrc_data = (255*(mrc_data - np.min(mrc_data))/np.ptp(mrc_data)).astype(np.uint8) ## remap data from 0 -- 255
 
     ## check if a logical angpix value was given (default is -1) and use that instead, otherwise use value read from mrc file
     if input_angpix > 0:
@@ -108,14 +140,15 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         print(" Unexpected pixel size after parsing. Cannot print scalebar despite flag given!")
         PRINT_SCALEBAR = False
 
-    ## apply sigma contrast to the image
-    im_contrast_adjusted = apply_sigma_contrast(mrc_data, 3)
+    if input_lowpass_filter > 0:
+        print(" Running low pass filter (%s Ang)" % input_lowpass_filter)
+        mrc_data, ctf = lowpass2(mrc_data, input_lowpass_filter, angpix)
 
-    ## rescale the image data to grayscale range (0,255)
-    remapped = (255*(im_contrast_adjusted - np.min(im_contrast_adjusted))/np.ptp(im_contrast_adjusted)).astype(np.uint8) ## remap data from 0 -- 255
+    ## apply sigma contrast to the image
+    mrc_data = sigma_contrast(mrc_data, input_sigma_contrast)
 
     ## load the image data into a PIL.Image object
-    im = Image.fromarray(remapped).convert('RGB')
+    im = Image.fromarray(mrc_data).convert('RGB')
 
     ## figure out the name of the file
     if BATCH_MODE:
@@ -154,6 +187,42 @@ def save_image(mrc_filename, output_file, BATCH_MODE, BIN_IMAGE, binning_factor,
         print("  >> image written: %s" % img_name )
 
     return
+
+
+
+def lowpass2(img, threshold, pixel_size):
+    """ Another example of a fast implementation of a lowpass filter (not used here)
+        ref: https://wsthub.medium.com/python-computer-vision-tutorials-image-fourier-transform-part-3-e65d10be4492
+    """
+
+    ## create circle mask at a resolution given by the threshold and pixel size
+    radius = int(img.shape[0] * pixel_size / threshold)
+    if DEBUG: print(" FFT mask radius calculated for %s ang (%s apix) is %s" % (threshold, pixel_size, radius))
+    mask = np.zeros_like(img)
+    cy = mask.shape[0] // 2
+    cx = mask.shape[1] // 2
+    cv2.circle(mask, (cx,cy), radius, (255,255), -1)[0]
+    ## blur the mask
+    lowpass_mask = cv2.GaussianBlur(mask, (19,19), 0)
+
+    f = cv2.dft(img.astype(np.float32), flags=cv2.DFT_COMPLEX_OUTPUT)
+    f_shifted = np.fft.fftshift(f)
+    f_complex = f_shifted[:,:,0]*1j + f_shifted[:,:,1]
+    f_filtered = lowpass_mask * f_complex
+    f_filtered_shifted = np.fft.fftshift(f_filtered)
+    inv_img = np.fft.ifft2(f_filtered_shifted) # inverse F.T.
+    filtered_img = np.abs(inv_img)
+    filtered_img -= filtered_img.min()
+    filtered_img = filtered_img*255 / filtered_img.max()
+    filtered_img = filtered_img.astype(np.uint8)
+
+    ## to view the fft we need to play with the results
+    f_abs = np.abs(f_complex)
+    f_bounded = 20 * np.log(f_abs) # we take the logarithm of the absolute value of f_complex, because f_abs has tremendously wide range.
+    f_img = 255 * f_bounded / np.max(f_bounded) ## convert data to grayscale based on the new range
+    f_img = f_img.astype(np.uint8)
+    return filtered_img, f_img
+
 
 def add_scalebar(image_obj, scalebar_px):
     """ Adds a scalebar to the input image and returns a new edited image
@@ -209,6 +278,13 @@ def check_dependencies():
         print(" ERROR :: Failed to import 'mrcfile'. Try: pip install mrcfile")
         sys.exit()
 
+    try:
+        globals()['cv2'] = __import__('cv2') ## similar to: import numpy as np
+
+    except:
+        print("Could not import cv2, try installing OpenCV via:")
+        print("   $ pip install opencv-python")
+
 
 #############################
 ###     RUN BLOCK
@@ -223,6 +299,12 @@ if __name__ == "__main__":
     from multiprocessing import Process, Pool
     import time
     import cmdline_parser
+
+    try:
+        import cv2 ## for resizing images with a scaling factor
+    except:
+        print("Could not import cv2, try installing OpenCV via:")
+        print("   $ pip install opencv-python")
 
     try:
         from PIL import Image
@@ -252,6 +334,8 @@ if __name__ == "__main__":
         'PRINT_SCALEBAR' : False,
         'scalebar_angstroms' : 200, # Angstroms
         'angpix' : -1,
+        'sigma_contrast' : 1, 
+        'lowpass': -1,
         'PARALLEL_PROCESSING': False,
         'threads' : 4
         }
@@ -264,7 +348,9 @@ if __name__ == "__main__":
 ##    flag      :  (PARAMS_key,       data_type,  legal_entries/range,    toggle for entry,   intrinsic toggle,                    has_defaults)
     '--bin'      :  ('binning_factor'   ,    int(),     (1, 999),               False,              (True, 'BIN_IMAGE', True),             True ),
     '--scalebar' :  ('scalebar_angstroms',   int(),     (1, 9999),              False,              (True, 'PRINT_SCALEBAR', True),        True ),
-    '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,              False,                                 True ),
+    '--angpix'   :  ('angpix',               float(),   (0.0001, 99999.999),    False,              False,                                  True ),
+    '--sigma_contrast'   :  ('sigma_contrast',               float(),   (0.0, 99999.999),    False,              False,                                  True ),
+    '--lowpass'   :  ('lowpass',               float(),   (0.0, 99999.999),    False,              False,                                  True ),
     '--batch_out':  ('batch_output_dir',     str(),     (),                False,              False,   True),
     '--j'        :  ('threads',              int(),     (0,999),                False,              (True, 'PARALLEL_PROCESSING', True),   True)
     }
@@ -309,7 +395,7 @@ if __name__ == "__main__":
         if '--j' in commands:
             print(" NOTE: --j flag was set for parallel processing, but without batch mode. Only 1 core can be used for processing a single image.")
         ## single image conversion mode
-        save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
+        save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'], PARAMS['sigma_contrast'], PARAMS['lowpass'])
     else:
         if PARAMS['PARALLEL_PROCESSING']:
             ## permit multithreading
@@ -326,7 +412,7 @@ if __name__ == "__main__":
                 ## define total workset inputs
                 dataset = []
                 for task in tasks:
-                    dataset.append((task, PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix']))
+                    dataset.append((task, PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'], PARAMS['sigma_contrast'], PARAMS['lowpass']))
                 ## prepare pool of workers
                 pool = Pool(threads)
                 ## assign workload to pool
@@ -345,7 +431,7 @@ if __name__ == "__main__":
             ## get all files with extension
             for file in glob.glob("*.mrc"):
                 PARAMS['mrc_file'] = file
-                save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'])
+                save_image(PARAMS['mrc_file'], PARAMS['output_file'], PARAMS['BATCH_MODE'], PARAMS['BIN_IMAGE'], PARAMS['binning_factor'], PARAMS['PRINT_SCALEBAR'], PARAMS['scalebar_angstroms'], PARAMS['angpix'], PARAMS['sigma_contrast'], PARAMS['lowpass'])
 
     end_time = time.time()
     total_time_taken = end_time - start_time
