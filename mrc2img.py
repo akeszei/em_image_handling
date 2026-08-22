@@ -7,8 +7,10 @@
 
 ## 2021-08-26: Script written
 ## 2021-08-28: Updated command line parsing to make more general, and renamed script to reflect multiple image handling
-## 2022-12-19: To Do: - Fix bug with scalebar printing incorrectly in some edge cases (no bin, scalebar size given, angpix given)
-                    # - Read angpix from header of mrc by default
+## 2022-12-19: Read angpix from header of mrc by default
+## 2026-08-11: Updated to include low pass filtering, which provides best contrast for low signal micrographs
+## TO DO :  - Fix bug with scalebar printing incorrectly in some edge cases (no bin, scalebar size given, angpix given) << check if this is working
+##          - Implement --batch_out (dir) flag!
 
 #############################
 ###     FLAGS
