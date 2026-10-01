@@ -16,7 +16,7 @@ To Do:
 class Parameters:
     in_fpath: str = "" # mrc/mrcs file whose header we want to copy from
     out_png_fpath: str = "" # location and name of png we want to write out 
-    scaling_factor: float = 1.0
+    scaling_factor: float = 0.5
 
     def usage(self):
         print("================================================================================================================")
