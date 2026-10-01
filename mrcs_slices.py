@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 """
 To Do:
-    - Set options for scaling factor, and specific slices to make instead of just 10% of dataset 
+    - Set options for giving specific slices to make instead of just 10% of dataset 
 """
 
 @dataclass
@@ -20,9 +20,12 @@ class Parameters:
 
     def usage(self):
         print("================================================================================================================")
-        print(" Read mrc stack and write out integrated slices along z axis representing 10%% of the data each step.")
+        print(" Read mrc stack and write out integrated slices along z axis representing 10% of the data each step.")
         print(" Usage:")
         print("    $ mrcs_slices.py  /path/to/ref.mrc  /path/to/save.png  ")
+        print(" -----------------------------------------------------------------------------------------------")
+        print(" Options (default in brackets): ")
+        print("             --scale (0.5) : each integrated slice by this factor")
         print("================================================================================================================")
         sys.exit()
         return 
@@ -57,26 +60,16 @@ class Parameters:
                 if cmd[-len('.png'):].lower() == '.png':
                     self.set_pngfile(cmd)
 
-        ### Examples to add flags 
-        # for i in range(len(cmdline)):
-        #     cmd = cmdline[i]
+        ## Deal with flags 
+        for i in range(len(cmdline)):
+            cmd = cmdline[i]
 
-        #     if cmd == '--spacing':
+            if cmd == '--scale':
 
-        #         try:
-        #             self.distance_between_picks = int( float(cmdline[i + 1]) / self.mrc_angpix)
-        #             print(" Assigned inter-coordinate spacing of %s Ang (%s pixels)" % (float(cmdline[i + 1]), self.distance_between_picks ))
-        #         except:
-        #             print(" ERROR :: Could not assign spacing value given ")
-                
-
-        #     if cmd == '--diameter':
-
-        #         try:
-        #             self.filament_diameter_px = int( float(cmdline[i + 1]) / self.mrc_angpix)
-        #             print(" Assigned filament diameter to %s Ang (%s pixels)" % (float(cmdline[i + 1]), self.filament_diameter_px))
-        #         except:
-        #             print(" ERROR :: Could not assign diameter value given: ", int( float(cmdline[i + 1]) / self.mrc_angpix))
+                try:
+                    self.scaling_factor = float(cmdline[i + 1])
+                except:
+                    print(" ERROR :: Could not --scale flag  ")
 
         return 
 
@@ -317,7 +310,7 @@ def create_image_array(imgs, ncols = 5, padding = 2, order_to_print = None, VERB
 
     return canvas
 
-def add_scalebar(im, box_size, angpix, scalebar_size, indent_px = 8, stroke = 4, VEROBSE = False):
+def add_scalebar(im, box_size, angpix, scalebar_size, indent_px = 8, stroke = 4, VERBOSE = False):
     if angpix == 0:
         print(" ERROR :: Pixel size not known (currently detected as 0). Will not add scalebar.")
         return im
@@ -325,7 +318,7 @@ def add_scalebar(im, box_size, angpix, scalebar_size, indent_px = 8, stroke = 4,
     scalebar_px = int(scalebar_size / angpix)
     if scalebar_px > box_size:
         print(" ERROR : Requested scalebar size (%s Ang, %s px) exceeds the dimensions of the image (%s px)!" % (scalebar_size, scalebar_px, box_size))
-        usage()
+        sys.exit()
 
     ## find the pixel range for the scalebar, typically 5 x 5 pixels up from bottom left
     LEFT_INDENT = indent_px # px from left to indent the scalebar
