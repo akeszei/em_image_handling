@@ -16,7 +16,8 @@ To Do:
 class Parameters:
     in_fpath: str = "" # mrc/mrcs file whose header we want to copy from
     out_png_fpath: str = "" # location and name of png we want to write out 
-    scaling_factor: float = 0.5
+    scaling_factor: float = 1
+    slices_percent: tuple = ((0,20), (20,40), (40,60), (60,80), (80,100))
 
     def usage(self):
         print("================================================================================================================")
@@ -26,6 +27,9 @@ class Parameters:
         print(" -----------------------------------------------------------------------------------------------")
         print(" Options (default in brackets): ")
         print("             --scale (0.5) : each integrated slice by this factor")
+        print("    --set_slice (0,100,10) : set range of z stack to read and the thickness of each slice to step in percent")
+        print("                             e.g. 0,100,10 == read from 0 to 100% of the mrcs, integrating slabs of 10% thickness")
+        print("                                 [0,10] -> [10,20] -> ... -> [90,100]")
         print("================================================================================================================")
         sys.exit()
         return 
@@ -65,11 +69,17 @@ class Parameters:
             cmd = cmdline[i]
 
             if cmd == '--scale':
-
                 try:
                     self.scaling_factor = float(cmdline[i + 1])
                 except:
                     print(" ERROR :: Could not --scale flag  ")
+
+            if cmd == '--set_slice':
+                try:
+                    self.set_slice_from_string(cmdline[i + 1])
+                except:
+                    print(" ERROR :: Could not parse --set_slice flag  ")
+
 
         return 
 
@@ -103,12 +113,48 @@ class Parameters:
 
         return 
 
+    def set_slice_from_string(self, s):
+        print(" string to parse into slice data =", s)
+        ## decompose the string into list of values using comma delimeter 
+        l = s.split(',')
+        if len(l) != 3:
+            print(" ERROR ! Expected 3 values for --set_slice flag, instead got: %s" % s)
+            self.usage()
+
+        try:
+            start_percent = int(l[0])
+            end_percent = int(l[1])
+            step_percent = int(l[2])
+        except:
+            print(" ERROR ! Could not parse --set_slice values into integers or floats")
+            self.usage()
+
+        if end_percent < start_percent or end_percent > 100:
+            print(" ERROR ! --set_slice flag has incorrect end_percent value (middle value)")
+            self.usage()
+        if start_percent > end_percent or start_percent < 0:
+            print(" ERROR ! --set_slice flag has incorrect start_percent value (first value)")
+            self.usage()
+        if step_percent > 100:
+            print(" ERROR ! --set_slice flag has incorrect step value (last value)")
+            self.usage()
+
+        slice_steps = []
+        for i in range(start_percent, end_percent, step_percent):
+            step = (i, i+step_percent)
+            slice_steps.append(step)
+
+        self.slices_percent = tuple(slice_steps)
+
+        return 
+
     def print_parameters(self):
         print(" Parameters:")
         print("----------------------------------------")
         print("  input mrc file : ", self.in_fpath)
         print(" output png file : ", self.out_png_fpath)
         print("  scaling factor : ", self.scaling_factor)
+        print("     slice steps : ", self.slices_percent)
         return 
 
 #region Global functions
@@ -366,16 +412,22 @@ if __name__ == '__main__':
 
     x_dim, y_dim, z_dim, pixel_size, dtype = get_mrcs_info(f)
 
-    ## how many slices represent 10% of the z height
-    ten_percent_chunk = z_dim // 10 
+    # ## how many slices represent the desired % of the total z height
+    # ten_percent_chunk = z_dim // 10 
 
-    ## generate a list of 10% steps we can use to call the slice generator 
+    # ## generate a list of 10% steps we can use to call the slice generator 
+    # slices = []
+    # for i in range(0, z_dim, ten_percent_chunk):
+    #     x = i
+    #     y = i + ten_percent_chunk
+    #     slices.append((x,y))
+
+    ## recast the percent slices into raw z frame ranges
     slices = []
-    for i in range(0, z_dim, ten_percent_chunk):
-        x = i
-        y = i + ten_percent_chunk
-        slices.append((x,y))
-        
+    for (x,y) in params.slices_percent:
+        # print(x,y, "slice to raw z -> ", int(z_dim * x/100), int(z_dim * y/100))
+        slices.append((int(z_dim * x/100), int(z_dim * y/100)))
+
     ## load mrcs data in memory 
     raw_data = get_mrcs_raw_data(f)
 
@@ -392,6 +444,6 @@ if __name__ == '__main__':
     img = PIL_Image.fromarray(im_array)
     img.save(save_path)
     print(" Written file: ", save_path)
-    # img.show()
+    img.show()
 
 #endregion 
