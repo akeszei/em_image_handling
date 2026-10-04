@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 """
 To Do:
-    - Set options for giving specific slices to make instead of just 10% of dataset 
+    - Set options for column number  
 """
 
 @dataclass
