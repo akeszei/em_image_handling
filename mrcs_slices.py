@@ -27,7 +27,7 @@ class Parameters:
         print(" -----------------------------------------------------------------------------------------------")
         print(" Options (default in brackets): ")
         print("             --scale (0.5) : each integrated slice by this factor")
-        print("    --set_slice (0,100,10) : set range of z stack to read and the thickness of each slice to step in percent")
+        print("    --set_slice (0,100,20) : set range of z stack to read and the thickness of each slice to step in percent")
         print("                             e.g. 0,100,10 == read from 0 to 100% of the mrcs, integrating slabs of 10% thickness")
         print("                                 [0,10] -> [10,20] -> ... -> [90,100]")
         print("================================================================================================================")
@@ -444,6 +444,6 @@ if __name__ == '__main__':
     img = PIL_Image.fromarray(im_array)
     img.save(save_path)
     print(" Written file: ", save_path)
-    img.show()
+    # img.show()
 
 #endregion 
