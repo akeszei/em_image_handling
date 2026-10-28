@@ -157,6 +157,16 @@ class Parameters:
         print("     slice steps : ", self.slices_percent)
         return 
 
+    def check_inputs(self):
+        if len(params.out_png_fpath) == 0:
+            print(" ERROR :: Missing output .PNG file, see usage below")
+            self.usage()
+        if len(params.in_fpath) == 0:
+            print(" ERROR :: Missing input .MRC/S file, see usage below")
+            self.usage()
+
+        return
+
 #region Global functions
 
 def get_mrcs_raw_data(mrcs_file_path):
@@ -402,8 +412,10 @@ if __name__ == '__main__':
 
     params = Parameters()
     params.parse_cmdline()
-
+    params.check_inputs()
     params.print_parameters()
+
+
 
     ## set the values here
     f = params.in_fpath
